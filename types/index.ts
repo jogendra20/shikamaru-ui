@@ -32,6 +32,14 @@ export interface Project {
   lastAnalyzed?: string;
 }
 
+export interface SavedAutomation {
+  id: string;
+  name: string;
+  filepath: string;
+  prompt: string;
+  savedAt: number;
+}
+
 export interface DeployResult {
   status: string;
   message: string;

@@ -31,6 +31,11 @@ const DIFF_STYLE = {
 
 type Tab = "chat" | "projects" | "activity";
 
+interface PendingScript {
+  filepath: string;
+  prompt: string;
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activities, setActivities] = useState<AgentActivity[]>([]);
@@ -40,6 +45,10 @@ export default function Home() {
   const [detected, setDetected] = useState<Difficulty>("easy");
   const [tab, setTab] = useState<Tab>("chat");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [pendingScript, setPendingScript] = useState<PendingScript | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [savedAutomations, setSavedAutomations] = useState<{id:string;name:string;filepath:string;prompt:string;savedAt:number}[]>([]);
 
   const handleInput = (v: string) => {
     setInput(v);
@@ -228,6 +237,94 @@ export default function Home() {
                     </motion.div>
                   )}
                 </div>
+                {/* Save / Delete prompt */}
+                {pendingScript && !showSaveInput && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ background: "#12121C", border: "1px solid #F59E0B44", borderRadius: 14, padding: 14, margin: "4px 0" }}
+                  >
+                    <div style={{ fontSize: 12, color: "#8888AA", marginBottom: 10, fontFamily: "monospace" }}>
+                      💾 Keep this script?
+                    </div>
+                    <div style={{ fontSize: 11, color: "#F59E0B", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
+                      {pendingScript.filepath}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowSaveInput(true)}
+                        style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#F59E0B", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}
+                      >
+                        Save
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={async () => {
+                          await fetch("/api/nexus", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ endpoint: "delete-script", filepath: pendingScript.filepath }),
+                          });
+                          setPendingScript(null);
+                          setMessages(prev => [...prev, {
+                            id: crypto.randomUUID(), role: "assistant",
+                            content: "🗑️ Script deleted.",
+                            timestamp: Date.now(),
+                          }]);
+                        }}
+                        style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#EF4444", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}
+                      >
+                        Delete
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Save name input */}
+                {pendingScript && showSaveInput && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ background: "#12121C", border: "1px solid #F59E0B44", borderRadius: 14, padding: 14, margin: "4px 0" }}
+                  >
+                    <div style={{ fontSize: 12, color: "#8888AA", marginBottom: 10, fontFamily: "monospace" }}>
+                      Name this automation:
+                    </div>
+                    <input
+                      value={saveName}
+                      onChange={e => setSaveName(e.target.value)}
+                      placeholder="e.g. NSE Top Gainers"
+                      autoFocus
+                      style={{ width: "100%", background: "#0A0A14", border: "1px solid #1E1E2E", borderRadius: 8, padding: "8px 12px", color: "#F1F1F1", fontSize: 13, fontFamily: "Geist, sans-serif", outline: "none", marginBottom: 10 }}
+                    />
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        if (!saveName.trim()) return;
+                        setSavedAutomations(prev => [...prev, {
+                          id: crypto.randomUUID(),
+                          name: saveName.trim(),
+                          filepath: pendingScript.filepath,
+                          prompt: pendingScript.prompt,
+                          savedAt: Date.now(),
+                        }]);
+                        setPendingScript(null);
+                        setShowSaveInput(false);
+                        setSaveName("");
+                        setMessages(prev => [...prev, {
+                          id: crypto.randomUUID(), role: "assistant",
+                          content: `✅ Saved as "${saveName.trim()}" — visible in Projects tab.`,
+                          timestamp: Date.now(),
+                        }]);
+                      }}
+                      style={{ width: "100%", padding: "8px 0", borderRadius: 8, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#F59E0B", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}
+                    >
+                      Confirm Save
+                    </motion.button>
+                  </motion.div>
+                )}
+
                 <div style={{ height: 16 }} />
               </div>
 
@@ -300,9 +397,25 @@ export default function Home() {
                   </motion.div>
                 ))}
               </div>
-              <div style={{ marginTop: 24, padding: "12px 16px", background: "#12121C", borderRadius: 12, border: "1px solid #1E1E2E" }}>
-                <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>Archive</div>
-                <div style={{ fontSize: 12, color: "#8888AA" }}>Hard tasks stored here</div>
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Saved Automations</div>
+                {savedAutomations.length === 0 && (
+                  <div style={{ fontSize: 12, color: "#8888AA", fontFamily: "monospace" }}>None saved yet</div>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {savedAutomations.map(a => (
+                    <motion.div
+                      key={a.id}
+                      whileTap={{ scale: 0.97 }}
+                      style={{ background: "#12121C", borderRadius: 12, padding: 12, border: "1px solid #1E1E2E", cursor: "pointer" }}
+                      onClick={() => { setInput(a.prompt); setTab("chat"); }}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F1F1", marginBottom: 4 }}>{a.name}</div>
+                      <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.prompt}</div>
+                      <div style={{ fontSize: 10, color: "#F59E0B", fontFamily: "monospace", marginTop: 4 }}>tap to rerun</div>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const { endpoint, ...payload } = body;
 
   try {
-    const res = await fetch(`${NEXUS_URL}/${endpoint}`, {
+    const res = await fetch(`${NEXUS_URL}/${endpoint === "delete-script" ? "delete-script" : endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
