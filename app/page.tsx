@@ -162,7 +162,7 @@ export default function Home() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              style={{ height: "100%", display: "flex", flexDirection: "column" }}
+              style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}
             >
               {/* Messages */}
               <div id="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0", WebkitOverflowScrolling: "touch" }}>
