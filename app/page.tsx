@@ -135,10 +135,10 @@ export default function Home() {
   };
 
   return (
-    <div style={{ background: "#07070E", minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: "Geist, sans-serif" }}>
+    <div style={{ background: "#07070E", height: "100dvh", display: "flex", flexDirection: "column", fontFamily: "Geist, sans-serif", overflow: "hidden" }}>
       
       {/* Header */}
-      <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #1a1a2e", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0A0A14" }}>
+      <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #1a1a2e", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0A0A14", flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, color: "#F1F1F1", letterSpacing: "-0.5px" }}>NEXUS</div>
           <div style={{ fontSize: 10, color: "#F59E0B", fontFamily: "monospace", letterSpacing: "2px", marginTop: 1 }}>SHIKAMARU · ONLINE</div>
@@ -152,7 +152,7 @@ export default function Home() {
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+      <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>
 
         {/* CHAT TAB */}
         <AnimatePresence mode="wait">
@@ -345,7 +345,7 @@ export default function Home() {
               </div>
 
               {/* Input */}
-              <div style={{ padding: "12px 16px 16px", borderTop: "1px solid #1a1a2e", background: "#0A0A14" }}>
+              <div style={{ padding: "12px 16px 16px", borderTop: "1px solid #1a1a2e", background: "#0A0A14", flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                   {(["easy", "medium", "hard"] as Difficulty[]).map(d => (
                     <motion.button
@@ -483,7 +483,7 @@ export default function Home() {
       </div>
 
       {/* Bottom nav */}
-      <div style={{ display: "flex", borderTop: "1px solid #1a1a2e", background: "#0A0A14" }}>
+      <div style={{ display: "flex", borderTop: "1px solid #1a1a2e", background: "#0A0A14", flexShrink: 0 }}>
         {([
           { id: "chat", icon: MessageSquare, label: "Chat" },
           { id: "projects", icon: FolderOpen, label: "Projects" },
