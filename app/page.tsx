@@ -152,7 +152,7 @@ export default function Home() {
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
 
         {/* CHAT TAB */}
         <AnimatePresence mode="wait">
