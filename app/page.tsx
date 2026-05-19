@@ -50,6 +50,7 @@ export default function Home() {
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [enhancedPrompt, setEnhancedPrompt] = useState<string | null>(null);
   const [enhancing, setEnhancing] = useState(false);
+  const [forceAutomate, setForceAutomate] = useState(false);
   const [savedAutomations, setSavedAutomations] = useState<{id:string;name:string;filepath:string;prompt:string;savedAt:number}[]>(() => {
     try {
       const stored = localStorage.getItem("shikamaru_automations");
@@ -96,6 +97,16 @@ export default function Home() {
     }
   };
 
+  const handleAutomate = async () => {
+    if (!input.trim() || loading || enhancing) return;
+    setForceAutomate(true);
+    if (isVague(input.trim())) {
+      await handleEnhance();
+    } else {
+      handleSend(true);
+    }
+  };
+
   const addActivity = useCallback((a: AgentActivity) => {
     setActivities(prev => [a, ...prev].slice(0, 30));
   }, []);
@@ -106,10 +117,11 @@ export default function Home() {
     } catch { /* storage full or SSR */ }
   }, [savedAutomations]);
 
-  const handleSend = async () => {
+  const handleSend = async (forceAuto: boolean = false) => {
     if (!input.trim() || loading) return;
     const prompt = input.trim();
     setInput("");
+    setForceAutomate(false);
 
     const userMsg: Message = {
       id: crypto.randomUUID(), role: "user", content: prompt,
@@ -125,7 +137,7 @@ export default function Home() {
     });
 
     try {
-      const isAutomation = ["scrape","automate","extract","fill form","playwright","portal","crawl"]
+      const isAutomation = forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"]
         .some(k => prompt.toLowerCase().includes(k));
 
       const start = Date.now();
@@ -398,14 +410,10 @@ export default function Home() {
                   <div style={{ fontSize: 13, color: "#F1F1F1", lineHeight: 1.6, marginBottom: 12 }}>{enhancedPrompt}</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <motion.button whileTap={{ scale: 0.95 }} onClick={() => {
-                      const p = enhancedPrompt;
+                      const p = enhancedPrompt!;
                       setEnhancedPrompt(null);
-                      setInput("");
-                      setTimeout(() => {
-                        const prompt = p;
-                        setInput(prompt);
-                        handleSend();
-                      }, 0);
+                      setInput(p);
+                      setTimeout(() => handleSend(forceAutomate), 0);
                     }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#A78BFA", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
                       Use This
                     </motion.button>
@@ -452,6 +460,14 @@ export default function Home() {
                     rows={1}
                     style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#F1F1F1", fontSize: 14, fontFamily: "Geist, sans-serif", resize: "none", lineHeight: 1.5 }}
                   />
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleAutomate}
+                    disabled={!input.trim() || loading || enhancing}
+                    style={{ background: input.trim() && !loading ? "rgba(96,165,250,0.15)" : "transparent", border: "1px solid", borderColor: input.trim() && !loading ? "rgba(96,165,250,0.4)" : "#1E1E2E", borderRadius: 8, padding: "0 10px", height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", transition: "all 0.2s", flexShrink: 0 }}
+                  >
+                    <span style={{ fontSize: 10, fontFamily: "monospace", color: input.trim() && !loading ? "#60A5FA" : "#8888AA", whiteSpace: "nowrap" }}>⚡ Auto</span>
+                  </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.85 }}
                     onClick={handleEnhance}
