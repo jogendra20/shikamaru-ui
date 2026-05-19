@@ -48,7 +48,12 @@ export default function Home() {
   const [pendingScript, setPendingScript] = useState<PendingScript | null>(null);
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
-  const [savedAutomations, setSavedAutomations] = useState<{id:string;name:string;filepath:string;prompt:string;savedAt:number}[]>([]);
+  const [savedAutomations, setSavedAutomations] = useState<{id:string;name:string;filepath:string;prompt:string;savedAt:number}[]>(() => {
+    try {
+      const stored = localStorage.getItem("shikamaru_automations");
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
 
   const handleInput = (v: string) => {
     setInput(v);
@@ -62,6 +67,12 @@ export default function Home() {
   const addActivity = useCallback((a: AgentActivity) => {
     setActivities(prev => [a, ...prev].slice(0, 30));
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("shikamaru_automations", JSON.stringify(savedAutomations));
+    } catch { /* storage full or SSR */ }
+  }, [savedAutomations]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -422,13 +433,19 @@ export default function Home() {
                   {savedAutomations.map(a => (
                     <motion.div
                       key={a.id}
-                      whileTap={{ scale: 0.97 }}
-                      style={{ background: "#12121C", borderRadius: 12, padding: 12, border: "1px solid #1E1E2E", cursor: "pointer" }}
-                      onClick={() => { setInput(a.prompt); setTab("chat"); }}
+                      style={{ background: "#12121C", borderRadius: 12, padding: 12, border: "1px solid #1E1E2E" }}
                     >
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F1F1", marginBottom: 4 }}>{a.name}</div>
-                      <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.prompt}</div>
-                      <div style={{ fontSize: 10, color: "#F59E0B", fontFamily: "monospace", marginTop: 4 }}>tap to rerun</div>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => { setInput(a.prompt); setTab("chat"); }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F1F1", marginBottom: 4 }}>{a.name}</div>
+                          <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.prompt}</div>
+                          <div style={{ fontSize: 10, color: "#F59E0B", fontFamily: "monospace", marginTop: 4 }}>tap to rerun</div>
+                        </div>
+                        <button
+                          onClick={() => setSavedAutomations(prev => prev.filter(x => x.id !== a.id))}
+                          style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 16, padding: "0 2px", flexShrink: 0, lineHeight: 1 }}
+                        >✕</button>
+                      </div>
                     </motion.div>
                   ))}
                 </div>
