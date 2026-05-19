@@ -218,13 +218,25 @@ export default function Home() {
                           background: m.role === "user" ? "#F59E0B" : "#12121C",
                           color: m.role === "user" ? "#000" : "#F1F1F1",
                           fontSize: 14,
-                          lineHeight: 1.5,
+                          lineHeight: 1.6,
                           border: m.role === "assistant" ? "1px solid #1E1E2E" : "none",
-                          fontFamily: m.isCode ? "monospace" : "inherit",
-                          whiteSpace: m.isCode ? "pre-wrap" : "normal",
                           wordBreak: "break-word",
                         }}>
-                          {m.content}
+                          {m.role === "assistant" ? m.content.split("\n").map((line: string, i: number) => {
+                            if (line.startsWith("🧠 Think:")) return (
+                              <div key={i} style={{ color: "#A78BFA", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(167,139,250,0.08)", borderRadius: 6, borderLeft: "2px solid #A78BFA" }}>{line}</div>
+                            );
+                            if (line.startsWith("⚡ Act:")) return (
+                              <div key={i} style={{ color: "#F59E0B", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(245,158,11,0.08)", borderRadius: 6, borderLeft: "2px solid #F59E0B" }}>{line}</div>
+                            );
+                            if (line.startsWith("👁️ Observe:")) return (
+                              <div key={i} style={{ color: "#10B981", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(16,185,129,0.08)", borderRadius: 6, borderLeft: "2px solid #10B981" }}>{line}</div>
+                            );
+                            if (line.startsWith("```") || m.isCode) return (
+                              <pre key={i} style={{ fontFamily: "monospace", fontSize: 12, whiteSpace: "pre-wrap", margin: "4px 0" }}>{line}</pre>
+                            );
+                            return <div key={i} style={{ marginBottom: 2 }}>{line}</div>;
+                          }) : m.content}
                         </div>
                         <div style={{ fontSize: 10, color: "#8888AA", fontFamily: "monospace", paddingLeft: 2, paddingRight: 2 }}>
                           {new Date(m.timestamp).toLocaleTimeString()}
