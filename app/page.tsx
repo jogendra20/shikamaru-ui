@@ -455,11 +455,11 @@ export default function Home() {
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-end", background: "#12121C", border: "1px solid #1E1E2E", borderRadius: 14, padding: "10px 14px" }}>
                   <textarea
                     value={input}
-                    onChange={e => handleInput(e.target.value)}
+                    onChange={e => { handleInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnhance(); } }}
                     placeholder="Ask Nexus anything..."
                     rows={1}
-                    style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#F1F1F1", fontSize: 14, fontFamily: "Geist, sans-serif", resize: "none", lineHeight: 1.5 }}
+                    style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#F1F1F1", fontSize: 14, fontFamily: "Geist, sans-serif", resize: "none", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}
                   />
                   <motion.button
                     whileTap={{ scale: 0.9 }}
