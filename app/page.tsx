@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Message, AgentActivity, Difficulty, Project } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Zap, FolderOpen, Activity, MessageSquare, ChevronRight } from "lucide-react";
