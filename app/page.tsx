@@ -106,6 +106,10 @@ export default function Home() {
         task: prompt.slice(0, 60), responseTime: elapsed, timestamp: Date.now(),
       });
 
+      const scriptFile = data.file ?? null;
+      if (isAutomation && scriptFile) {
+        setPendingScript({ filepath: scriptFile, prompt });
+      }
       const content = isAutomation
         ? `Automation queued\n\nProvider: ${provider}\nDifficulty: ${difficulty}\n\nCheck Telegram for output.`
         : data.response ?? data.error ?? "No response";
@@ -161,7 +165,7 @@ export default function Home() {
               style={{ height: "100%", display: "flex", flexDirection: "column" }}
             >
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0" }}>
+              <div id="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0", WebkitOverflowScrolling: "touch" }}>
                 {messages.length === 0 && (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}>
                     <div style={{ fontSize: 40 }}>🎯</div>
