@@ -48,6 +48,8 @@ export default function Home() {
   const [pendingScript, setPendingScript] = useState<PendingScript | null>(null);
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
+  const [enhancedPrompt, setEnhancedPrompt] = useState<string | null>(null);
+  const [enhancing, setEnhancing] = useState(false);
   const [savedAutomations, setSavedAutomations] = useState<{id:string;name:string;filepath:string;prompt:string;savedAt:number}[]>(() => {
     try {
       const stored = localStorage.getItem("shikamaru_automations");
@@ -61,6 +63,36 @@ export default function Home() {
       const d = detectDifficulty(v);
       setDetected(d);
       setDifficulty(d);
+    }
+  };
+
+  const isVague = (p: string) => {
+    const words = p.trim().split(/\s+/);
+    const actionVerbs = ["scrape","fetch","go to","open","analyze","compare","build","extract","automate","find","search","get","check","monitor","download","send","create","list","show"];
+    const hasAction = actionVerbs.some(v => p.toLowerCase().includes(v));
+    return words.length < 6 || !hasAction;
+  };
+
+  const handleEnhance = async () => {
+    if (!input.trim() || loading || enhancing) return;
+    if (!isVague(input.trim())) { handleSend(); return; }
+    setEnhancing(true);
+    try {
+      const res = await fetch("/api/nexus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "enhance", prompt: input.trim() }),
+      });
+      const data = await res.json();
+      if (data.enhanced) {
+        setEnhancedPrompt(data.enhanced);
+      } else {
+        handleSend();
+      }
+    } catch {
+      handleSend();
+    } finally {
+      setEnhancing(false);
     }
   };
 
@@ -355,6 +387,42 @@ export default function Home() {
                 <div style={{ height: 16 }} />
               </div>
 
+              {/* Enhanced Prompt Card */}
+              {enhancedPrompt && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{ margin: "0 16px 8px", background: "#12121C", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 14, padding: 14, flexShrink: 0 }}
+                >
+                  <div style={{ fontSize: 10, color: "#A78BFA", fontFamily: "monospace", letterSpacing: "1px", marginBottom: 8 }}>⚡ PROMPT ENHANCED</div>
+                  <div style={{ fontSize: 13, color: "#F1F1F1", lineHeight: 1.6, marginBottom: 12 }}>{enhancedPrompt}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => {
+                      const p = enhancedPrompt;
+                      setEnhancedPrompt(null);
+                      setInput("");
+                      setTimeout(() => {
+                        const prompt = p;
+                        setInput(prompt);
+                        handleSend();
+                      }, 0);
+                    }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#A78BFA", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+                      Use This
+                    </motion.button>
+                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => {
+                      setInput(enhancedPrompt);
+                      setEnhancedPrompt(null);
+                    }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", color: "#F59E0B", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+                      Edit
+                    </motion.button>
+                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => setEnhancedPrompt(null)}
+                      style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#EF4444", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+                      Cancel
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Input */}
               <div style={{ padding: "12px 16px 16px", borderTop: "1px solid #1a1a2e", background: "#0A0A14", flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -379,18 +447,18 @@ export default function Home() {
                   <textarea
                     value={input}
                     onChange={e => handleInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnhance(); } }}
                     placeholder="Ask Nexus anything..."
                     rows={1}
                     style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#F1F1F1", fontSize: 14, fontFamily: "Geist, sans-serif", resize: "none", lineHeight: 1.5 }}
                   />
                   <motion.button
                     whileTap={{ scale: 0.85 }}
-                    onClick={handleSend}
-                    disabled={!input.trim() || loading}
-                    style={{ background: input.trim() && !loading ? "#F59E0B" : "#1E1E2E", border: "none", borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", transition: "all 0.2s", flexShrink: 0 }}
+                    onClick={handleEnhance}
+                    disabled={!input.trim() || loading || enhancing}
+                    style={{ background: input.trim() && !loading && !enhancing ? "#F59E0B" : "#1E1E2E", border: "none", borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", transition: "all 0.2s", flexShrink: 0 }}
                   >
-                    <Send size={14} color={input.trim() && !loading ? "#000" : "#8888AA"} />
+                    <Send size={14} color={input.trim() && !loading && !enhancing ? "#000" : "#8888AA"} />
                   </motion.button>
                 </div>
               </div>
