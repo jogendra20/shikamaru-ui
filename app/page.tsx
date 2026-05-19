@@ -100,6 +100,7 @@ export default function Home() {
   const handleAutomate = async () => {
     if (!input.trim() || loading || enhancing) return;
     setForceAutomate(true);
+    if (difficulty === "easy") setDifficulty("medium");
     if (isVague(input.trim())) {
       await handleEnhance();
     } else {
