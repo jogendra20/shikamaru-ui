@@ -44,9 +44,26 @@ const PROVIDER_ICONS: Record<string, string> = {
 };
 
 const PROVIDER_COLOR: Record<string, string> = {
-  github_models: "#7C3AED", gemini: "#059669", groq: "#DC2626",
-  nvidia: "#2563EB", cerebras: "#D97706", huggingface: "#EC4899",
-  mistral: "#0891B2", openrouter: "#6366F1", pollinations: "#10B981",
+  github_models: "#F59E0B", gemini: "#FBBF24", groq: "#D97706",
+  nvidia: "#FCD34D", cerebras: "#F59E0B", huggingface: "#FBBF24",
+  mistral: "#D97706", openrouter: "#F59E0B", pollinations: "#FCD34D",
+};
+
+// Amber theme tokens
+const A = {
+  gold:    "#F59E0B",
+  bright:  "#FCD34D",
+  dim:     "#92400E",
+  glow:    "rgba(245,158,11,0.15)",
+  glowMd:  "rgba(245,158,11,0.25)",
+  glowHi:  "rgba(245,158,11,0.45)",
+  border:  "rgba(245,158,11,0.18)",
+  borderHi:"rgba(245,158,11,0.4)",
+  bg:      "#080806",
+  surface: "rgba(245,158,11,0.04)",
+  text:    "#FEF3C7",
+  muted:   "#78716C",
+  faint:   "#292524",
 };
 
 const IMAGE_KEYWORDS = [
@@ -77,7 +94,7 @@ const SUGGESTIONS = [
 ];
 
 const DIFF_COLOR: Record<Difficulty, string> = {
-  easy: "#10B981", medium: "#3B82F6", hard: "#F59E0B",
+  easy: "#10B981", medium: "#60A5FA", hard: "#F59E0B",
 };
 
 export default function Home() {
@@ -229,133 +246,176 @@ export default function Home() {
 
   const glowPulse = `
     @keyframes glow-pulse {
-      0%, 100% { opacity: 0.4; transform: scale(1); }
-      50% { opacity: 0.8; transform: scale(1.05); }
+      0%, 100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.08); }
     }
     @keyframes orbit {
-      from { transform: rotate(0deg) translateX(28px) rotate(0deg); }
-      to { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
-    }
-    @keyframes scan {
-      0% { top: 0; opacity: 0.6; }
-      100% { top: 100%; opacity: 0; }
+      from { transform: rotate(0deg) translateX(22px) rotate(0deg); }
+      to   { transform: rotate(360deg) translateX(22px) rotate(-360deg); }
     }
     @keyframes fade-in {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes shimmer {
-      0% { background-position: -200% center; }
+      0%   { background-position: -200% center; }
       100% { background-position: 200% center; }
     }
+    @keyframes ticker {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
     * { box-sizing: border-box; }
-    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar { width: 2px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #2D2D5E; border-radius: 4px; }
-    .msg-in { animation: fade-in 0.25s ease; }
-    .shimmer-text {
-      background: linear-gradient(90deg, #7C3AED, #06B6D4, #7C3AED);
+    ::-webkit-scrollbar-thumb { background: #44403C; border-radius: 4px; }
+    .msg-in { animation: fade-in 0.2s ease; }
+    .gold-text {
+      background: linear-gradient(90deg, #F59E0B, #FCD34D, #F59E0B);
       background-size: 200% auto;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      animation: shimmer 3s linear infinite;
+      animation: shimmer 4s linear infinite;
+    }
+    .suggestion:hover {
+      border-color: rgba(245,158,11,0.45) !important;
+      background: rgba(245,158,11,0.08) !important;
+      color: #FCD34D !important;
     }
   `;
 
+  const TICKER_ITEMS = ["NIFTY 50  ▲ 0.42%", "SENSEX  ▲ 0.38%", "BANKNIFTY  ▼ 0.11%", "RELIANCE  ▲ 1.2%", "TCS  ▲ 0.8%", "INFY  ▼ 0.3%", "HDFC  ▲ 0.5%"];
+
   return (
     <div style={{
-      background: "#050508",
+      background: "#080806",
       height: "100dvh",
       display: "flex",
       flexDirection: "column",
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       overflow: "hidden",
       position: "relative",
+      color: "#FEF3C7",
     }}>
       <style>{glowPulse}</style>
 
-      {/* Background mesh */}
+      {/* Noise texture overlay */}
       <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124,58,237,0.12) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(6,182,212,0.07) 0%, transparent 50%)",
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0, opacity: 0.025,
+        backgroundImage: "url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")",
+        backgroundSize: "200px 200px",
       }} />
 
-      {/* Grid lines */}
+      {/* Amber glow top */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: "linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px)",
-        backgroundSize: "40px 40px",
+        background: "radial-gradient(ellipse 70% 35% at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 70%)",
       }} />
+
+      {/* Subtle grid */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
+        backgroundImage: "linear-gradient(rgba(245,158,11,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(245,158,11,0.03) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }} />
+
+      {/* Ticker tape */}
+      <div style={{
+        position: "relative", zIndex: 10, overflow: "hidden",
+        background: "rgba(245,158,11,0.06)",
+        borderBottom: "1px solid rgba(245,158,11,0.12)",
+        height: 22, flexShrink: 0, display: "flex", alignItems: "center",
+      }}>
+        <div style={{
+          display: "flex", gap: 40, whiteSpace: "nowrap",
+          animation: "ticker 20s linear infinite",
+        }}>
+          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+            <span key={i} style={{
+              fontSize: 9, letterSpacing: "1.5px", color: "#D97706", fontFamily: "inherit",
+            }}>
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
 
       {/* Header */}
       <div style={{
         position: "relative", zIndex: 10,
-        padding: "12px 16px",
-        borderBottom: "1px solid rgba(124,58,237,0.2)",
-        background: "rgba(5,5,8,0.8)",
-        backdropFilter: "blur(20px)",
+        padding: "10px 16px",
+        borderBottom: "1px solid rgba(245,158,11,0.12)",
+        background: "rgba(8,8,6,0.85)",
+        backdropFilter: "blur(24px)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexShrink: 0,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Orb */}
-          <div style={{ position: "relative", width: 32, height: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Gold orb */}
+          <div style={{ position: "relative", width: 28, height: 28 }}>
             <div style={{
               position: "absolute", inset: 0, borderRadius: "50%",
-              background: "radial-gradient(circle at 35% 35%, #A78BFA, #7C3AED 60%, #4C1D95)",
-              boxShadow: "0 0 20px rgba(124,58,237,0.6), 0 0 40px rgba(124,58,237,0.2)",
+              background: "radial-gradient(circle at 35% 35%, #FCD34D, #F59E0B 55%, #92400E)",
+              boxShadow: "0 0 16px rgba(245,158,11,0.7), 0 0 32px rgba(245,158,11,0.2)",
               animation: "glow-pulse 3s ease-in-out infinite",
             }} />
             <div style={{
-              position: "absolute", width: 5, height: 5, borderRadius: "50%",
-              background: "#06B6D4",
-              boxShadow: "0 0 8px #06B6D4",
-              top: "50%", left: "50%", marginTop: -2.5, marginLeft: -2.5,
-              animation: "orbit 4s linear infinite",
+              position: "absolute", width: 4, height: 4, borderRadius: "50%",
+              background: "#FEF3C7", boxShadow: "0 0 6px #FEF3C7",
+              top: "50%", left: "50%", marginTop: -2, marginLeft: -2,
+              animation: "orbit 5s linear infinite",
             }} />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "3px", color: "#F1F1F8" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "4px", color: "#FEF3C7" }}>
               NEXUS
             </div>
-            <div style={{ fontSize: 9, color: "#7C3AED", letterSpacing: "2px", marginTop: -1 }}>
+            <div style={{ fontSize: 8, color: "#92400E", letterSpacing: "2.5px", marginTop: -1 }}>
               SHIKAMARU · ONLINE
             </div>
           </div>
         </div>
 
-        {/* Status dots */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {["#10B981","#7C3AED","#06B6D4"].map((c, i) => (
-            <div key={i} style={{
-              width: 5, height: 5, borderRadius: "50%", background: c,
-              boxShadow: `0 0 6px ${c}`,
-              opacity: 0.8 + i * 0.1,
-            }} />
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 8, color: "#78716C", letterSpacing: "1px" }}>SYSTEM</div>
+            <div style={{ fontSize: 9, color: "#F59E0B" }}>ACTIVE</div>
+          </div>
+          <div style={{
+            width: 8, height: 8, borderRadius: "50%",
+            background: "#F59E0B",
+            boxShadow: "0 0 10px #F59E0B",
+            animation: "glow-pulse 2s ease-in-out infinite",
+          }} />
         </div>
       </div>
 
       {/* Tab bar */}
       <div style={{
         position: "relative", zIndex: 10,
-        display: "flex", gap: 2, padding: "6px 12px",
-        borderBottom: "1px solid rgba(124,58,237,0.1)",
-        background: "rgba(5,5,8,0.6)", backdropFilter: "blur(10px)",
+        display: "flex", padding: "0 12px",
+        borderBottom: "1px solid rgba(245,158,11,0.1)",
+        background: "rgba(8,8,6,0.7)", backdropFilter: "blur(10px)",
         flexShrink: 0,
       }}>
-        {(["chat","projects","activity"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer",
-            fontSize: 10, fontFamily: "inherit", letterSpacing: "1.5px",
-            fontWeight: tab === t ? 700 : 400,
-            background: tab === t ? "rgba(124,58,237,0.2)" : "transparent",
-            color: tab === t ? "#A78BFA" : "#4A4A7A",
-            borderBottom: tab === t ? "1px solid #7C3AED" : "1px solid transparent",
-            transition: "all 0.2s",
-            textTransform: "uppercase",
+        {([
+          { id: "chat", label: "CHAT", icon: "◈" },
+          { id: "projects", label: "PROJECTS", icon: "◉" },
+          { id: "activity", label: "ACTIVITY", icon: "◎" },
+        ] as { id: Tab; label: string; icon: string }[]).map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "8px 14px 7px", border: "none", cursor: "pointer",
+            fontSize: 9, fontFamily: "inherit", letterSpacing: "2px",
+            fontWeight: tab === t.id ? 700 : 400,
+            background: "transparent",
+            color: tab === t.id ? "#F59E0B" : "#44403C",
+            borderBottom: tab === t.id ? "2px solid #F59E0B" : "2px solid transparent",
+            transition: "all 0.15s",
+            display: "flex", alignItems: "center", gap: 5,
+            marginBottom: -1,
           }}>
-            {t}
+            <span style={{ fontSize: 10 }}>{t.icon}</span>
+            {t.label}
           </button>
         ))}
       </div>
@@ -376,27 +436,47 @@ export default function Home() {
               WebkitOverflowScrolling: "touch",
             }}>
               {messages.length === 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 20 }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div className="shimmer-text" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "4px", marginBottom: 6 }}>NEXUS</div>
-                    <div style={{ fontSize: 11, color: "#4A4A7A", letterSpacing: "2px" }}>PERSONAL AI SYSTEM</div>
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", paddingTop: 24, gap: 0 }}>
+                  {/* Compact identity block */}
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <div className="gold-text" style={{ fontSize: 32, fontWeight: 900, letterSpacing: "8px", lineHeight: 1 }}>NEXUS</div>
+                    <div style={{ fontSize: 9, color: "#57534E", letterSpacing: "3px", marginTop: 4 }}>PERSONAL · AI · SYSTEM</div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+
+                  {/* Stats row */}
+                  <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+                    {[
+                      { label: "AGENTS", val: "9" },
+                      { label: "STATUS", val: "LIVE" },
+                      { label: "MODE", val: "AUTO" },
+                    ].map((s, i) => (
+                      <div key={i} style={{
+                        flex: 1, padding: "8px 0", textAlign: "center",
+                        background: "rgba(245,158,11,0.04)",
+                        border: "1px solid rgba(245,158,11,0.12)",
+                        borderRadius: 8,
+                      }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#F59E0B" }}>{s.val}</div>
+                        <div style={{ fontSize: 8, color: "#57534E", letterSpacing: "1px", marginTop: 1 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Suggestions */}
+                  <div style={{ fontSize: 9, color: "#44403C", letterSpacing: "2px", marginBottom: 8 }}>QUICK COMMANDS</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     {SUGGESTIONS.map((s, i) => (
-                      <button key={i} onClick={() => handleSend(false, s)} style={{
-                        background: "rgba(124,58,237,0.06)",
-                        border: "1px solid rgba(124,58,237,0.15)",
-                        borderRadius: 8, padding: "9px 14px",
-                        color: "#6868A8", fontSize: 11, fontFamily: "inherit",
+                      <button key={i} className="suggestion" onClick={() => handleSend(false, s)} style={{
+                        background: "rgba(245,158,11,0.03)",
+                        border: "1px solid rgba(245,158,11,0.1)",
+                        borderRadius: 8, padding: "10px 14px",
+                        color: "#78716C", fontSize: 11, fontFamily: "inherit",
                         textAlign: "left", cursor: "pointer",
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        transition: "all 0.2s",
-                      }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(124,58,237,0.4)"; (e.currentTarget as HTMLElement).style.color = "#A78BFA"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(124,58,237,0.15)"; (e.currentTarget as HTMLElement).style.color = "#6868A8"; }}
-                      >
+                        transition: "all 0.15s",
+                      }}>
                         <span>{s}</span>
-                        <span style={{ opacity: 0.4, fontSize: 10 }}>→</span>
+                        <span style={{ color: "#44403C", fontSize: 12 }}>›</span>
                       </button>
                     ))}
                   </div>
@@ -414,7 +494,7 @@ export default function Home() {
                         {m.role === "assistant" && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 2 }}>
                             <span style={{ fontSize: 13 }}>{PROVIDER_ICONS[m.provider ?? ""] ?? "🤖"}</span>
-                            <span style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "1px", textTransform: "uppercase" }}>
+                            <span style={{ fontSize: 9, color: "#57534E", letterSpacing: "1px", textTransform: "uppercase" }}>
                               {m.provider}
                             </span>
                             {m.difficulty && (
@@ -434,13 +514,13 @@ export default function Home() {
                           padding: "10px 14px",
                           borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "4px 14px 14px 14px",
                           background: m.role === "user"
-                            ? "linear-gradient(135deg, #7C3AED, #5B21B6)"
-                            : "rgba(255,255,255,0.04)",
-                          border: m.role === "user" ? "none" : "1px solid rgba(124,58,237,0.15)",
-                          color: m.role === "user" ? "#fff" : "#C4C4E8",
+                            ? "linear-gradient(135deg, #D97706, #92400E)"
+                            : "rgba(255,255,255,0.03)",
+                          border: m.role === "user" ? "none" : "1px solid rgba(245,158,11,0.1)",
+                          color: m.role === "user" ? "#FEF3C7" : "#D6D3D1",
                           fontSize: 13, lineHeight: 1.65,
                           boxShadow: m.role === "user"
-                            ? "0 4px 20px rgba(124,58,237,0.3)"
+                            ? "0 4px 20px rgba(217,119,6,0.3)"
                             : "none",
                           wordBreak: "break-word",
                         }}>
@@ -459,9 +539,9 @@ export default function Home() {
                                 style={{
                                   display: "inline-flex", alignItems: "center", gap: 6,
                                   padding: "5px 10px", borderRadius: 6, width: "fit-content",
-                                  background: "rgba(6,182,212,0.1)",
+                                  background: "rgba(245,158,11,0.08)",
                                   border: "1px solid rgba(6,182,212,0.3)",
-                                  color: "#06B6D4", fontSize: 10, textDecoration: "none",
+                                  color: "#F59E0B", fontSize: 10, textDecoration: "none",
                                   letterSpacing: "1px",
                                 }}>
                                 ⬇ DOWNLOAD
@@ -470,7 +550,7 @@ export default function Home() {
                           ) : m.role === "assistant" ? (
                             m.content.split("\n").map((line, i) => {
                               if (line.startsWith("🧠 Think:")) return (
-                                <div key={i} style={{ color: "#A78BFA", fontSize: 11, marginBottom: 5, padding: "3px 8px", background: "rgba(167,139,250,0.08)", borderRadius: 5, borderLeft: "2px solid #7C3AED" }}>{line}</div>
+                                <div key={i} style={{ color: "#F59E0B", fontSize: 11, marginBottom: 5, padding: "3px 8px", background: "rgba(245,158,11,0.08)", borderRadius: 5, borderLeft: "2px solid #D97706" }}>{line}</div>
                               );
                               if (line.startsWith("⚡ Act:")) return (
                                 <div key={i} style={{ color: "#F59E0B", fontSize: 11, marginBottom: 5, padding: "3px 8px", background: "rgba(245,158,11,0.08)", borderRadius: 5, borderLeft: "2px solid #F59E0B" }}>{line}</div>
@@ -485,7 +565,7 @@ export default function Home() {
                         </div>
 
                         {/* Timestamp */}
-                        <div style={{ fontSize: 9, color: "#2D2D5E", letterSpacing: "0.5px" }}>
+                        <div style={{ fontSize: 9, color: "#44403C", letterSpacing: "0.5px" }}>
                           {m.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </div>
                       </div>
@@ -498,7 +578,7 @@ export default function Home() {
                       {[0,1,2].map(i => (
                         <div key={i} style={{
                           width: 5, height: 5, borderRadius: "50%",
-                          background: "#7C3AED",
+                          background: "#F59E0B",
                           animation: `glow-pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
                         }} />
                       ))}
@@ -543,7 +623,7 @@ export default function Home() {
             {showSaveInput && pendingScript && (
               <div style={{
                 margin: "0 12px 6px", padding: "8px 12px",
-                background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)",
+                background: "rgba(245,158,11,0.04)", border: "1px solid rgba(124,58,237,0.2)",
                 borderRadius: 8, display: "flex", gap: 6, flexShrink: 0,
               }}>
                 <input
@@ -566,13 +646,13 @@ export default function Home() {
                 }} style={{
                   fontSize: 9, padding: "3px 10px", borderRadius: 5,
                   border: "1px solid rgba(124,58,237,0.4)",
-                  background: "rgba(124,58,237,0.15)", color: "#A78BFA",
+                  background: "rgba(245,158,11,0.1)", color: "#F59E0B",
                   cursor: "pointer", fontFamily: "inherit",
                 }}>SAVE</button>
                 <button onClick={() => { setShowSaveInput(false); setSaveName(""); }} style={{
                   fontSize: 9, padding: "3px 8px", borderRadius: 5,
                   border: "1px solid rgba(255,255,255,0.08)",
-                  background: "transparent", color: "#4A4A7A",
+                  background: "transparent", color: "#57534E",
                   cursor: "pointer", fontFamily: "inherit",
                 }}>✕</button>
               </div>
@@ -581,7 +661,7 @@ export default function Home() {
             {/* Input area */}
             <div style={{
               padding: "8px 12px 12px", flexShrink: 0,
-              borderTop: "1px solid rgba(124,58,237,0.1)",
+              borderTop: "1px solid rgba(245,158,11,0.08)",
               background: "rgba(5,5,8,0.6)", backdropFilter: "blur(20px)",
             }}>
               {/* Difficulty selector */}
@@ -591,7 +671,7 @@ export default function Home() {
                     padding: "3px 10px", borderRadius: 5, border: "none", cursor: "pointer",
                     fontSize: 9, fontFamily: "inherit", letterSpacing: "1px",
                     background: difficulty === d ? `${DIFF_COLOR[d]}20` : "transparent",
-                    color: difficulty === d ? DIFF_COLOR[d] : "#2D2D5E",
+                    color: difficulty === d ? DIFF_COLOR[d] : "#44403C",
                     borderBottom: difficulty === d ? `1px solid ${DIFF_COLOR[d]}` : "1px solid transparent",
                     transition: "all 0.15s",
                   }}>{d.toUpperCase()}</button>
@@ -601,7 +681,7 @@ export default function Home() {
                   padding: "3px 10px", borderRadius: 5, border: "none", cursor: "pointer",
                   fontSize: 9, fontFamily: "inherit", letterSpacing: "1px",
                   background: forceAutomate ? "rgba(6,182,212,0.15)" : "transparent",
-                  color: forceAutomate ? "#06B6D4" : "#2D2D5E",
+                  color: forceAutomate ? "#F59E0B" : "#44403C",
                   borderBottom: forceAutomate ? "1px solid #06B6D4" : "1px solid transparent",
                   transition: "all 0.15s",
                 }}>⚡ AUTO</button>
@@ -610,8 +690,8 @@ export default function Home() {
               {/* Text input row */}
               <div style={{
                 display: "flex", gap: 8, alignItems: "flex-end",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(124,58,237,0.2)",
+                background: "rgba(245,158,11,0.03)",
+                border: "1px solid rgba(245,158,11,0.15)",
                 borderRadius: 12, padding: "8px 10px",
               }}>
                 <textarea
@@ -636,12 +716,12 @@ export default function Home() {
                   style={{
                     width: 34, height: 34, borderRadius: 8, border: "none",
                     background: input.trim() && !loading
-                      ? "linear-gradient(135deg, #7C3AED, #5B21B6)"
-                      : "rgba(255,255,255,0.05)",
-                    color: input.trim() && !loading ? "#fff" : "#2D2D5E",
+                      ? "linear-gradient(135deg, #F59E0B, #D97706)"
+                      : "rgba(255,255,255,0.04)",
+                    color: input.trim() && !loading ? "#080806" : "#44403C",
                     cursor: input.trim() && !loading ? "pointer" : "default",
                     fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: input.trim() && !loading ? "0 0 16px rgba(124,58,237,0.4)" : "none",
+                    boxShadow: input.trim() && !loading ? "0 0 16px rgba(245,158,11,0.5)" : "none",
                     transition: "all 0.2s", flexShrink: 0,
                   }}>
                   →
@@ -657,7 +737,7 @@ export default function Home() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ height: "100%", overflowY: "auto", padding: "16px 12px" }}>
 
-            <div style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "2px", marginBottom: 14 }}>ACTIVE REPOS</div>
+            <div style={{ fontSize: 9, color: "#57534E", letterSpacing: "2px", marginBottom: 14 }}>ACTIVE REPOS</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
               {projects.map(p => (
                 <div key={p.id} style={{
@@ -669,12 +749,12 @@ export default function Home() {
                 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#C4C4E8", marginBottom: 2 }}>{p.name}</div>
-                    <div style={{ fontSize: 10, color: "#4A4A7A" }}>{p.lastCommit}</div>
+                    <div style={{ fontSize: 10, color: "#57534E" }}>{p.lastCommit}</div>
                   </div>
                   <div style={{
                     fontSize: 8, padding: "2px 8px", borderRadius: 4, letterSpacing: "1px",
                     background: p.status === "active" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.05)",
-                    color: p.status === "active" ? "#10B981" : "#4A4A7A",
+                    color: p.status === "active" ? "#10B981" : "#57534E",
                     border: `1px solid ${p.status === "active" ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.05)"}`,
                   }}>{p.status.toUpperCase()}</div>
                 </div>
@@ -683,25 +763,25 @@ export default function Home() {
 
             {savedAutomations.length > 0 && (
               <>
-                <div style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "2px", marginBottom: 12 }}>SAVED AUTOMATIONS</div>
+                <div style={{ fontSize: 9, color: "#57534E", letterSpacing: "2px", marginBottom: 12 }}>SAVED AUTOMATIONS</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {savedAutomations.map(a => (
                     <div key={a.id} style={{
                       padding: "10px 14px",
-                      background: "rgba(6,182,212,0.04)",
+                      background: "rgba(245,158,11,0.03)",
                       border: "1px solid rgba(6,182,212,0.12)",
                       borderRadius: 10,
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                     }}>
                       <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: "#06B6D4", marginBottom: 2 }}>{a.name}</div>
-                        <div style={{ fontSize: 10, color: "#4A4A7A" }}>{a.prompt.slice(0, 48)}…</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#F59E0B", marginBottom: 2 }}>{a.name}</div>
+                        <div style={{ fontSize: 10, color: "#57534E" }}>{a.prompt.slice(0, 48)}…</div>
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <button onClick={() => { setTab("chat"); handleSend(true, a.prompt); }} style={{
                           fontSize: 9, padding: "3px 8px", borderRadius: 5,
                           border: "1px solid rgba(6,182,212,0.3)",
-                          background: "rgba(6,182,212,0.1)", color: "#06B6D4",
+                          background: "rgba(245,158,11,0.08)", color: "#F59E0B",
                           cursor: "pointer", fontFamily: "inherit",
                         }}>▶ RUN</button>
                         <button onClick={() => setSavedAutomations(prev => prev.filter(x => x.id !== a.id))} style={{
@@ -724,9 +804,9 @@ export default function Home() {
           <motion.div key="activity"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ height: "100%", overflowY: "auto", padding: "16px 12px" }}>
-            <div style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "2px", marginBottom: 14 }}>SYSTEM ACTIVITY</div>
+            <div style={{ fontSize: 9, color: "#57534E", letterSpacing: "2px", marginBottom: 14 }}>SYSTEM ACTIVITY</div>
             {messages.filter(m => m.role === "assistant").length === 0 ? (
-              <div style={{ color: "#2D2D5E", fontSize: 11, textAlign: "center", marginTop: 40 }}>
+              <div style={{ color: "#44403C", fontSize: 11, textAlign: "center", marginTop: 40 }}>
                 No activity yet.
               </div>
             ) : (
@@ -741,12 +821,12 @@ export default function Home() {
                   }}>
                     <span style={{ fontSize: 14 }}>{PROVIDER_ICONS[m.provider ?? ""] ?? "🤖"}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, color: "#6868A8", marginBottom: 2 }}>{m.provider?.toUpperCase()}</div>
-                      <div style={{ fontSize: 11, color: "#4A4A7A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 10, color: "#78716C", marginBottom: 2 }}>{m.provider?.toUpperCase()}</div>
+                      <div style={{ fontSize: 11, color: "#57534E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {m.content.startsWith("__IMAGE__") ? "🖼 Image generated" : m.content.slice(0, 60)}
                       </div>
                     </div>
-                    <div style={{ fontSize: 9, color: "#2D2D5E", flexShrink: 0 }}>
+                    <div style={{ fontSize: 9, color: "#44403C", flexShrink: 0 }}>
                       {m.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   </div>
