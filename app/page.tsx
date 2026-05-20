@@ -1,126 +1,121 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
-import { Message, AgentActivity, Difficulty, Project } from "@/types";
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Zap, FolderOpen, Activity, MessageSquare, ChevronRight } from "lucide-react";
 
-const PROVIDER_ICONS: Record<string, string> = {
-  mistral: "💻", gemini: "✨", groq: "🚀", nvidia: "🧠",
-  github_models: "🔮", cerebras: "⚡", openrouter: "🌐", huggingface: "🤗", nexus: "🎯",
-};
+type Role = "user" | "assistant";
+type Difficulty = "easy" | "medium" | "hard";
+type Tab = "chat" | "projects" | "activity";
 
-const IMAGE_KEYWORDS = ["generate image","create image","draw","make image","imagine","sketch","paint","visualize","want an image","need an image","image for","make a poster","create a poster","poster for","an image of","a picture of","photo of","render a","design a","illustration"];
-
-const INITIAL_PROJECTS: Project[] = [
-  { id: "onyx", name: "Onyx", repo: "jogendra20/onyx", status: "active", lastCommit: "PWA reading app" },
-  { id: "hunter", name: "HUNTER", repo: "jogendra20/hunter", status: "active", lastCommit: "NSE journal tool" },
-];
-
-function detectDifficulty(prompt: string): Difficulty {
-  const p = prompt.toLowerCase();
-  const hard = ["architecture","analyze","compare","deep","comprehensive","strategy","build full","implement"];
-  const medium = ["scrape","automate","extract","fill form","portal","multiple","fetch all","playwright"];
-  if (hard.some(k => p.includes(k))) return "hard";
-  if (medium.some(k => p.includes(k))) return "medium";
-  return "easy";
+interface Message {
+  id: string;
+  role: Role;
+  content: string;
+  provider?: string;
+  difficulty?: Difficulty;
+  timestamp: Date;
 }
 
-const DIFF_STYLE = {
-  easy:   { text: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/30", glow: "" },
-  medium: { text: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/30",    glow: "" },
-  hard:   { text: "text-amber-400",   bg: "bg-amber-400/10",   border: "border-amber-400/30",   glow: "shadow-[0_0_12px_rgba(251,191,36,0.2)]" },
-};
+interface Project {
+  id: string;
+  name: string;
+  repo: string;
+  status: "active" | "idle";
+  lastCommit: string;
+}
 
-type Tab = "chat" | "projects" | "activity";
+interface SavedAutomation {
+  id: string;
+  name: string;
+  prompt: string;
+  filepath: string;
+  createdAt: string;
+}
 
 interface PendingScript {
   filepath: string;
   prompt: string;
 }
 
+const PROVIDER_ICONS: Record<string, string> = {
+  mistral: "💻", gemini: "✨", groq: "🚀", nvidia: "🧠",
+  github_models: "🔮", cerebras: "⚡", openrouter: "🌐",
+  huggingface: "🤗", nexus: "🎯", pollinations: "🌸",
+};
+
+const PROVIDER_COLOR: Record<string, string> = {
+  github_models: "#7C3AED", gemini: "#059669", groq: "#DC2626",
+  nvidia: "#2563EB", cerebras: "#D97706", huggingface: "#EC4899",
+  mistral: "#0891B2", openrouter: "#6366F1", pollinations: "#10B981",
+};
+
+const IMAGE_KEYWORDS = [
+  "generate image","create image","draw","make image","imagine",
+  "sketch","paint","visualize","want an image","need an image",
+  "image for","make a poster","create a poster","poster for",
+  "an image of","a picture of","photo of","render a","design a","illustration",
+];
+
+const INITIAL_PROJECTS: Project[] = [
+  { id: "onyx", name: "Onyx", repo: "jogendra20/onyx", status: "active", lastCommit: "PWA reading app" },
+  { id: "hunter", name: "HUNTER", repo: "jogendra20/hunter", status: "active", lastCommit: "NSE journal tool" },
+  { id: "automate", name: "Automate", repo: "jogendra20/Automate", status: "active", lastCommit: "GitHub Actions runner" },
+];
+
+function detectDifficulty(prompt: string): Difficulty {
+  const p = prompt.toLowerCase();
+  if (["architecture","analyze","compare","deep","comprehensive","strategy","build full","implement"].some(k => p.includes(k))) return "hard";
+  if (["scrape","automate","extract","fill form","portal","multiple","fetch all","playwright"].some(k => p.includes(k))) return "medium";
+  return "easy";
+}
+
+const SUGGESTIONS = [
+  "Scrape NSE top gainers today",
+  "Draw a dark cyberpunk city at night",
+  "Analyze my Onyx codebase structure",
+  "What is the latest Nifty 50 trend?",
+];
+
+const DIFF_COLOR: Record<Difficulty, string> = {
+  easy: "#10B981", medium: "#3B82F6", hard: "#F59E0B",
+};
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
-  const [detected, setDetected] = useState<Difficulty>("easy");
   const [tab, setTab] = useState<Tab>("chat");
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [pendingScript, setPendingScript] = useState<PendingScript | null>(null);
-  const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
-  const [enhancedPrompt, setEnhancedPrompt] = useState<string | null>(null);
-  const [enhancing, setEnhancing] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [savedAutomations, setSavedAutomations] = useState<SavedAutomation[]>([]);
   const [forceAutomate, setForceAutomate] = useState(false);
-  const [savedAutomations, setSavedAutomations] = useState<{id:string;name:string;filepath:string;prompt:string;savedAt:number}[]>(() => {
-    try {
-      const stored = localStorage.getItem("shikamaru_automations");
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
+  const [projects] = useState<Project[]>(INITIAL_PROJECTS);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleInput = (v: string) => {
-    setInput(v);
-    if (v.trim()) {
-      const d = detectDifficulty(v);
-      setDetected(d);
-      setDifficulty(d);
-    }
-  };
-
-  const isVague = (p: string) => {
-    const words = p.trim().split(/\s+/);
-    const actionVerbs = ["scrape","fetch","go to","open","analyze","compare","build","extract","automate","find","search","get","check","monitor","download","send","create","list","show"];
-    const hasAction = actionVerbs.some(v => p.toLowerCase().includes(v));
-    return words.length < 6 || !hasAction;
-  };
-
-  const handleEnhance = async () => {
-    if (!input.trim() || loading || enhancing) return;
-    if (!isVague(input.trim())) { handleSend(); return; }
-    setEnhancing(true);
-    try {
-      const res = await fetch("/api/nexus", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: "enhance", prompt: input.trim() }),
-      });
-      const data = await res.json();
-      if (data.enhanced) {
-        setEnhancedPrompt(data.enhanced);
-      } else {
-        handleSend();
-      }
-    } catch {
-      handleSend();
-    } finally {
-      setEnhancing(false);
-    }
-  };
-
-  const handleAutomate = async () => {
-    if (!input.trim() || loading || enhancing) return;
-    setForceAutomate(true);
-    if (difficulty === "easy") setDifficulty("medium");
-    if (isVague(input.trim())) {
-      await handleEnhance();
-    } else {
-      handleSend(true);
-    }
-  };
-
-  const addActivity = useCallback((a: AgentActivity) => {
-    setActivities(prev => [a, ...prev].slice(0, 30));
+  useEffect(() => {
+    const stored = localStorage.getItem("savedAutomations");
+    if (stored) setSavedAutomations(JSON.parse(stored));
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("shikamaru_automations", JSON.stringify(savedAutomations));
-    } catch { /* storage full or SSR */ }
+    localStorage.setItem("savedAutomations", JSON.stringify(savedAutomations));
   }, [savedAutomations]);
 
-  const pollOutput = async (runId: string, msgId: string) => {
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, []);
+
+  const pollOutput = useCallback(async (runId: string, msgId: string) => {
     const maxAttempts = 24;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 5000));
@@ -144,531 +139,624 @@ export default function Home() {
     setMessages(prev => prev.map(m =>
       m.id === msgId ? { ...m, content: "⏱ Timed out waiting for output." } : m
     ));
-  };
+  }, []);
 
-  const handleSend = async (forceAuto: boolean = false) => {
-    if (!input.trim() || loading) return;
-    const prompt = input.trim();
+  const handleSend = useCallback(async (forceAuto = false, overridePrompt?: string) => {
+    const prompt = (overridePrompt ?? input).trim();
+    if (!prompt || loading) return;
     setInput("");
-    setForceAutomate(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
+    const detected = detectDifficulty(prompt);
     const userMsg: Message = {
       id: crypto.randomUUID(), role: "user", content: prompt,
-      difficulty, timestamp: Date.now(),
+      difficulty: detected, timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
-    setTab("chat");
-
-    addActivity({
-      id: crypto.randomUUID(), provider: "nexus", status: "thinking",
-      task: prompt.slice(0, 60), timestamp: Date.now(),
-    });
 
     try {
-      // Intent classification — LLM decides routing
+      // Intent classification
       let intent = "ask";
       if (forceAuto || forceAutomate) {
         intent = "automation";
       } else {
         try {
-          const intentRes = await fetch("/api/nexus", {
+          const ir = await fetch("/api/nexus", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ endpoint: "classify", prompt }),
           });
-          const intentData = await intentRes.json();
-          intent = intentData.intent ?? "ask";
+          const id = await ir.json();
+          intent = id.intent ?? "ask";
         } catch {
-          // fallback: keyword check
-          intent = ["draw","image","poster","render","paint","sketch"].some(k => prompt.toLowerCase().includes(k)) ? "image" : "ask";
+          intent = IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k)) ? "image" : "ask";
         }
       }
+
       const isImage = intent === "image";
       const isAutomation = intent === "automation";
+      const finalDiff: Difficulty = forceAuto || forceAutomate ? (detected === "easy" ? "medium" : detected) : detected;
 
       const start = Date.now();
       const res = await fetch("/api/nexus", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: intent === "image" ? "image" : intent === "automation" ? "deploy" : intent === "search" ? "ask" : "ask",
+          endpoint: isImage ? "image" : isAutomation ? "deploy" : "ask",
           prompt,
           task: isAutomation ? "automation" : undefined,
-          difficulty,
+          difficulty: finalDiff,
         }),
       });
 
       const data = await res.json();
-      const elapsed = Date.now() - start;
       const provider = data.provider ?? "nexus";
+      const responseTime = Date.now() - start;
 
-      addActivity({
-        id: crypto.randomUUID(), provider, status: data.error ? "failed" : "done",
-        task: prompt.slice(0, 60), responseTime: elapsed, timestamp: Date.now(),
-      });
-
-      const scriptFile = data.file ?? null;
-      if (isAutomation && scriptFile) {
-        setPendingScript({ filepath: scriptFile, prompt });
-      }
       const content = isImage
         ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
         : isAutomation
-        ? `⏳ Running...\n\nProvider: ${provider} · ${difficulty}\n\nFetching output...`
+        ? `⏳ Running...\n\nProvider: ${provider} · ${finalDiff}\n\nFetching output...`
         : data.response ?? data.error ?? "No response";
 
-      setMessages(prev => [...prev, {
-        id: crypto.randomUUID(), role: "assistant", content, provider,
-        task: data.task, difficulty, timestamp: Date.now(),
-        isCode: content.includes("def ") || content.includes("import "),
-      }]);
+      const assistantMsg: Message = {
+        id: crypto.randomUUID(), role: "assistant", content,
+        provider, difficulty: finalDiff, timestamp: new Date(),
+      };
 
-      if (isAutomation && data.run_id) {
-        setMessages(prev => {
-          const msgs = [...prev];
-          const idx = msgs.findLastIndex(m => m.role === "assistant");
-          if (idx !== -1) { setTimeout(() => pollOutput(data.run_id, msgs[idx].id), 100); }
-          return msgs;
-        });
+      setMessages(prev => [...prev, assistantMsg]);
+
+      if (isAutomation) {
+        const scriptFile = data.file ?? null;
+        if (scriptFile) setPendingScript({ filepath: scriptFile, prompt });
+        if (data.run_id) {
+          const mid = assistantMsg.id;
+          setTimeout(() => pollOutput(data.run_id, mid), 5000);
+        }
       }
-    } catch {
-      addActivity({
-        id: crypto.randomUUID(), provider: "nexus", status: "failed",
-        task: prompt.slice(0, 60), timestamp: Date.now(),
-      });
+
+      setForceAutomate(false);
+    } catch (err) {
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(), role: "assistant",
-        content: "Connection failed. Check Nexus status.",
-        timestamp: Date.now(),
+        content: "Connection error. Check Nexus.", timestamp: new Date(),
       }]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, loading, forceAutomate, pollOutput]);
+
+  const glowPulse = `
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+    @keyframes orbit {
+      from { transform: rotate(0deg) translateX(28px) rotate(0deg); }
+      to { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+    }
+    @keyframes scan {
+      0% { top: 0; opacity: 0.6; }
+      100% { top: 100%; opacity: 0; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    * { box-sizing: border-box; }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2D2D5E; border-radius: 4px; }
+    .msg-in { animation: fade-in 0.25s ease; }
+    .shimmer-text {
+      background: linear-gradient(90deg, #7C3AED, #06B6D4, #7C3AED);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 3s linear infinite;
+    }
+  `;
 
   return (
-    <div style={{ background: "#07070E", height: "100dvh", display: "flex", flexDirection: "column", fontFamily: "Geist, sans-serif", overflow: "hidden" }}>
-      
+    <div style={{
+      background: "#050508",
+      height: "100dvh",
+      display: "flex",
+      flexDirection: "column",
+      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      overflow: "hidden",
+      position: "relative",
+    }}>
+      <style>{glowPulse}</style>
+
+      {/* Background mesh */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
+        background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124,58,237,0.12) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(6,182,212,0.07) 0%, transparent 50%)",
+      }} />
+
+      {/* Grid lines */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
+        backgroundImage: "linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px)",
+        backgroundSize: "40px 40px",
+      }} />
+
       {/* Header */}
-      <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid #1a1a2e", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0A0A14", flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#F1F1F1", letterSpacing: "-0.5px" }}>NEXUS</div>
-          <div style={{ fontSize: 10, color: "#F59E0B", fontFamily: "monospace", letterSpacing: "2px", marginTop: 1 }}>SHIKAMARU · ONLINE</div>
+      <div style={{
+        position: "relative", zIndex: 10,
+        padding: "12px 16px",
+        borderBottom: "1px solid rgba(124,58,237,0.2)",
+        background: "rgba(5,5,8,0.8)",
+        backdropFilter: "blur(20px)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexShrink: 0,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Orb */}
+          <div style={{ position: "relative", width: 32, height: 32 }}>
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: "50%",
+              background: "radial-gradient(circle at 35% 35%, #A78BFA, #7C3AED 60%, #4C1D95)",
+              boxShadow: "0 0 20px rgba(124,58,237,0.6), 0 0 40px rgba(124,58,237,0.2)",
+              animation: "glow-pulse 3s ease-in-out infinite",
+            }} />
+            <div style={{
+              position: "absolute", width: 5, height: 5, borderRadius: "50%",
+              background: "#06B6D4",
+              boxShadow: "0 0 8px #06B6D4",
+              top: "50%", left: "50%", marginTop: -2.5, marginLeft: -2.5,
+              animation: "orbit 4s linear infinite",
+            }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "3px", color: "#F1F1F8" }}>
+              NEXUS
+            </div>
+            <div style={{ fontSize: 9, color: "#7C3AED", letterSpacing: "2px", marginTop: -1 }}>
+              SHIKAMARU · ONLINE
+            </div>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
-          <span style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace" }}>
-            {activities.filter(a => a.status === "thinking").length > 0 ? "working..." : "ready"}
-          </span>
+
+        {/* Status dots */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {["#10B981","#7C3AED","#06B6D4"].map((c, i) => (
+            <div key={i} style={{
+              width: 5, height: 5, borderRadius: "50%", background: c,
+              boxShadow: `0 0 6px ${c}`,
+              opacity: 0.8 + i * 0.1,
+            }} />
+          ))}
         </div>
       </div>
 
-      {/* Tab content */}
-      <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>
+      {/* Tab bar */}
+      <div style={{
+        position: "relative", zIndex: 10,
+        display: "flex", gap: 2, padding: "6px 12px",
+        borderBottom: "1px solid rgba(124,58,237,0.1)",
+        background: "rgba(5,5,8,0.6)", backdropFilter: "blur(10px)",
+        flexShrink: 0,
+      }}>
+        {(["chat","projects","activity"] as Tab[]).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+            fontSize: 10, fontFamily: "inherit", letterSpacing: "1.5px",
+            fontWeight: tab === t ? 700 : 400,
+            background: tab === t ? "rgba(124,58,237,0.2)" : "transparent",
+            color: tab === t ? "#A78BFA" : "#4A4A7A",
+            borderBottom: tab === t ? "1px solid #7C3AED" : "1px solid transparent",
+            transition: "all 0.2s",
+            textTransform: "uppercase",
+          }}>
+            {t}
+          </button>
+        ))}
+      </div>
 
-        {/* CHAT TAB */}
+      {/* Main content */}
+      <div style={{ flex: 1, position: "relative", zIndex: 5, minHeight: 0, overflow: "hidden" }}>
         <AnimatePresence mode="wait">
-          {tab === "chat" && (
-            <motion.div
-              key="chat"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}
-            >
-              {/* Messages */}
-              <div id="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 16px 0", WebkitOverflowScrolling: "touch" }}>
-                {messages.length === 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}>
-                    <div style={{ fontSize: 40 }}>🎯</div>
-                    <div style={{ color: "#8888AA", fontSize: 13, fontFamily: "monospace", textAlign: "center" }}>What needs to be done?</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", marginTop: 8 }}>
-                      {["What is VWAP?", "Scrape NSE top gainers", "Analyze HUNTER codebase"].map(s => (
-                        <motion.button
-                          key={s}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => { setInput(s); handleInput(s); }}
-                          style={{ background: "#12121C", border: "1px solid #1E1E2E", borderRadius: 10, padding: "10px 14px", color: "#8888AA", fontSize: 12, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
-                        >
-                          <span>{s}</span>
-                          <ChevronRight size={12} />
-                        </motion.button>
-                      ))}
-                    </div>
+
+        {/* ── CHAT TAB ── */}
+        {tab === "chat" && (
+          <motion.div key="chat"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+
+            {/* Messages */}
+            <div id="chat-scroll" style={{
+              flex: 1, overflowY: "auto", padding: "16px 12px 8px",
+              WebkitOverflowScrolling: "touch",
+            }}>
+              {messages.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 20 }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div className="shimmer-text" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "4px", marginBottom: 6 }}>NEXUS</div>
+                    <div style={{ fontSize: 11, color: "#4A4A7A", letterSpacing: "2px" }}>PERSONAL AI SYSTEM</div>
                   </div>
-                )}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {messages.map((m) => (
-                    <motion.div
-                      key={m.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}
-                    >
-                      <div style={{ maxWidth: "85%", display: "flex", flexDirection: "column", gap: 4, alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
-                        {m.role === "assistant" && m.provider && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                    {SUGGESTIONS.map((s, i) => (
+                      <button key={i} onClick={() => handleSend(false, s)} style={{
+                        background: "rgba(124,58,237,0.06)",
+                        border: "1px solid rgba(124,58,237,0.15)",
+                        borderRadius: 8, padding: "9px 14px",
+                        color: "#6868A8", fontSize: 11, fontFamily: "inherit",
+                        textAlign: "left", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        transition: "all 0.2s",
+                      }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(124,58,237,0.4)"; (e.currentTarget as HTMLElement).style.color = "#A78BFA"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(124,58,237,0.15)"; (e.currentTarget as HTMLElement).style.color = "#6868A8"; }}
+                      >
+                        <span>{s}</span>
+                        <span style={{ opacity: 0.4, fontSize: 10 }}>→</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {messages.map(m => (
+                    <div key={m.id} className="msg-in" style={{
+                      display: "flex",
+                      justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                    }}>
+                      <div style={{ maxWidth: "88%", display: "flex", flexDirection: "column", gap: 4, alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
+
+                        {/* Meta row */}
+                        {m.role === "assistant" && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 2 }}>
-                            <span style={{ fontSize: 12 }}>{PROVIDER_ICONS[m.provider] ?? "🤖"}</span>
-                            <span style={{ fontSize: 10, color: "#8888AA", fontFamily: "monospace", textTransform: "capitalize" }}>
-                              {m.provider.replace("_", " ")}
+                            <span style={{ fontSize: 13 }}>{PROVIDER_ICONS[m.provider ?? ""] ?? "🤖"}</span>
+                            <span style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "1px", textTransform: "uppercase" }}>
+                              {m.provider}
                             </span>
                             {m.difficulty && (
                               <span style={{
-                                fontSize: 9, fontFamily: "monospace", padding: "1px 6px", borderRadius: 4,
-                                color: DIFF_STYLE[m.difficulty].text.replace("text-", "").includes("emerald") ? "#34D399" : m.difficulty === "hard" ? "#F59E0B" : "#60A5FA",
-                                background: m.difficulty === "hard" ? "rgba(245,158,11,0.1)" : m.difficulty === "medium" ? "rgba(96,165,250,0.1)" : "rgba(52,211,153,0.1)",
-                                border: `1px solid ${m.difficulty === "hard" ? "rgba(245,158,11,0.3)" : m.difficulty === "medium" ? "rgba(96,165,250,0.3)" : "rgba(52,211,153,0.3)"}`,
-                              }}>
-                                {m.difficulty}
-                              </span>
+                                fontSize: 8, padding: "1px 5px", borderRadius: 3,
+                                background: `${DIFF_COLOR[m.difficulty]}18`,
+                                color: DIFF_COLOR[m.difficulty],
+                                border: `1px solid ${DIFF_COLOR[m.difficulty]}40`,
+                                letterSpacing: "1px",
+                              }}>{m.difficulty.toUpperCase()}</span>
                             )}
                           </div>
                         )}
+
+                        {/* Bubble */}
                         <div style={{
-                          borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                           padding: "10px 14px",
-                          background: m.role === "user" ? "#F59E0B" : "#12121C",
-                          color: m.role === "user" ? "#000" : "#F1F1F1",
-                          fontSize: 14,
-                          lineHeight: 1.6,
-                          border: m.role === "assistant" ? "1px solid #1E1E2E" : "none",
+                          borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "4px 14px 14px 14px",
+                          background: m.role === "user"
+                            ? "linear-gradient(135deg, #7C3AED, #5B21B6)"
+                            : "rgba(255,255,255,0.04)",
+                          border: m.role === "user" ? "none" : "1px solid rgba(124,58,237,0.15)",
+                          color: m.role === "user" ? "#fff" : "#C4C4E8",
+                          fontSize: 13, lineHeight: 1.65,
+                          boxShadow: m.role === "user"
+                            ? "0 4px 20px rgba(124,58,237,0.3)"
+                            : "none",
                           wordBreak: "break-word",
                         }}>
                           {m.role === "assistant" && m.content.startsWith("__IMAGE__") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                              <img src={m.content.replace("__IMAGE__", "")} alt="Generated" style={{ maxWidth: "100%", borderRadius: 10 }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                              <a href={m.content.replace("__IMAGE__", "")} download="nexus-image.jpg" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "#F59E0B", fontSize: 11, fontFamily: "monospace", textDecoration: "none", width: "fit-content" }}>⬇ Download</a>
+                              <img
+                                src={m.content.replace("__IMAGE__", "")}
+                                alt="Generated"
+                                style={{ maxWidth: "100%", borderRadius: 10, display: "block" }}
+                                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                              <a
+                                href={m.content.replace("__IMAGE__", "")}
+                                download="nexus-image.jpg"
+                                target="_blank" rel="noreferrer"
+                                style={{
+                                  display: "inline-flex", alignItems: "center", gap: 6,
+                                  padding: "5px 10px", borderRadius: 6, width: "fit-content",
+                                  background: "rgba(6,182,212,0.1)",
+                                  border: "1px solid rgba(6,182,212,0.3)",
+                                  color: "#06B6D4", fontSize: 10, textDecoration: "none",
+                                  letterSpacing: "1px",
+                                }}>
+                                ⬇ DOWNLOAD
+                              </a>
                             </div>
-                          ) : m.role === "assistant" ? m.content.split("\n").map((line: string, i: number) => {
-                            if (line.startsWith("🧠 Think:")) return (
-                              <div key={i} style={{ color: "#A78BFA", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(167,139,250,0.08)", borderRadius: 6, borderLeft: "2px solid #A78BFA" }}>{line}</div>
-                            );
-                            if (line.startsWith("⚡ Act:")) return (
-                              <div key={i} style={{ color: "#F59E0B", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(245,158,11,0.08)", borderRadius: 6, borderLeft: "2px solid #F59E0B" }}>{line}</div>
-                            );
-                            if (line.startsWith("👁️ Observe:")) return (
-                              <div key={i} style={{ color: "#10B981", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(16,185,129,0.08)", borderRadius: 6, borderLeft: "2px solid #10B981" }}>{line}</div>
-                            );
-                            if (line.startsWith("```") || m.isCode) return (
-                              <pre key={i} style={{ fontFamily: "monospace", fontSize: 12, whiteSpace: "pre-wrap", margin: "4px 0" }}>{line}</pre>
-                            );
-                            return <div key={i} style={{ marginBottom: 2 }}>{line}</div>;
-                          }) : m.content}
+                          ) : m.role === "assistant" ? (
+                            m.content.split("\n").map((line, i) => {
+                              if (line.startsWith("🧠 Think:")) return (
+                                <div key={i} style={{ color: "#A78BFA", fontSize: 11, marginBottom: 5, padding: "3px 8px", background: "rgba(167,139,250,0.08)", borderRadius: 5, borderLeft: "2px solid #7C3AED" }}>{line}</div>
+                              );
+                              if (line.startsWith("⚡ Act:")) return (
+                                <div key={i} style={{ color: "#F59E0B", fontSize: 11, marginBottom: 5, padding: "3px 8px", background: "rgba(245,158,11,0.08)", borderRadius: 5, borderLeft: "2px solid #F59E0B" }}>{line}</div>
+                              );
+                              if (line.startsWith("✅") || line.startsWith("❌")) return (
+                                <div key={i} style={{ fontWeight: 700, marginBottom: 4, color: line.startsWith("✅") ? "#10B981" : "#EF4444" }}>{line}</div>
+                              );
+                              if (line === "") return <div key={i} style={{ height: 6 }} />;
+                              return <div key={i}>{line}</div>;
+                            })
+                          ) : m.content}
                         </div>
-                        <div style={{ fontSize: 10, color: "#8888AA", fontFamily: "monospace", paddingLeft: 2, paddingRight: 2 }}>
-                          {new Date(m.timestamp).toLocaleTimeString()}
+
+                        {/* Timestamp */}
+                        <div style={{ fontSize: 9, color: "#2D2D5E", letterSpacing: "0.5px" }}>
+                          {m.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
+
+                  {/* Loading indicator */}
                   {loading && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: "flex", justifyContent: "flex-start" }}>
-                      <div style={{ background: "#12121C", border: "1px solid #1E1E2E", borderRadius: "18px 18px 18px 4px", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
-                        <Zap size={12} color="#F59E0B" style={{ animation: "pulse 1s infinite" }} />
-                        <span style={{ fontSize: 12, color: "#8888AA", fontFamily: "monospace" }}>routing to best agent...</span>
-                      </div>
-                    </motion.div>
+                    <div style={{ display: "flex", gap: 5, padding: "12px 14px", alignItems: "center" }}>
+                      {[0,1,2].map(i => (
+                        <div key={i} style={{
+                          width: 5, height: 5, borderRadius: "50%",
+                          background: "#7C3AED",
+                          animation: `glow-pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                        }} />
+                      ))}
+                    </div>
                   )}
+                  <div ref={chatEndRef} />
                 </div>
-                {/* Save / Delete prompt */}
-                {pendingScript && !showSaveInput && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{ background: "#12121C", border: "1px solid #F59E0B44", borderRadius: 14, padding: 14, margin: "4px 0" }}
-                  >
-                    <div style={{ fontSize: 12, color: "#8888AA", marginBottom: 10, fontFamily: "monospace" }}>
-                      💾 Keep this script?
-                    </div>
-                    <div style={{ fontSize: 11, color: "#F59E0B", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
-                      {pendingScript.filepath}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setShowSaveInput(true)}
-                        style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#F59E0B", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}
-                      >
-                        Save
-                      </motion.button>
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={async () => {
-                          await fetch("/api/nexus", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ endpoint: "delete-script", filepath: pendingScript.filepath }),
-                          });
-                          setPendingScript(null);
-                          setMessages(prev => [...prev, {
-                            id: crypto.randomUUID(), role: "assistant",
-                            content: "🗑️ Script deleted.",
-                            timestamp: Date.now(),
-                          }]);
-                        }}
-                        style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#EF4444", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}
-                      >
-                        Delete
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Save name input */}
-                {pendingScript && showSaveInput && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{ background: "#12121C", border: "1px solid #F59E0B44", borderRadius: 14, padding: 14, margin: "4px 0" }}
-                  >
-                    <div style={{ fontSize: 12, color: "#8888AA", marginBottom: 10, fontFamily: "monospace" }}>
-                      Name this automation:
-                    </div>
-                    <input
-                      value={saveName}
-                      onChange={e => setSaveName(e.target.value)}
-                      placeholder="e.g. NSE Top Gainers"
-                      autoFocus
-                      style={{ width: "100%", background: "#0A0A14", border: "1px solid #1E1E2E", borderRadius: 8, padding: "8px 12px", color: "#F1F1F1", fontSize: 13, fontFamily: "Geist, sans-serif", outline: "none", marginBottom: 10 }}
-                    />
-                    <motion.button
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        if (!saveName.trim()) return;
-                        setSavedAutomations(prev => [...prev, {
-                          id: crypto.randomUUID(),
-                          name: saveName.trim(),
-                          filepath: pendingScript.filepath,
-                          prompt: pendingScript.prompt,
-                          savedAt: Date.now(),
-                        }]);
-                        setPendingScript(null);
-                        setShowSaveInput(false);
-                        setSaveName("");
-                        setMessages(prev => [...prev, {
-                          id: crypto.randomUUID(), role: "assistant",
-                          content: `✅ Saved as "${saveName.trim()}" — visible in Projects tab.`,
-                          timestamp: Date.now(),
-                        }]);
-                      }}
-                      style={{ width: "100%", padding: "8px 0", borderRadius: 8, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#F59E0B", fontSize: 12, fontFamily: "monospace", cursor: "pointer" }}
-                    >
-                      Confirm Save
-                    </motion.button>
-                  </motion.div>
-                )}
-
-                <div style={{ height: 16 }} />
-              </div>
-
-              {/* Enhanced Prompt Card */}
-              {enhancedPrompt && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  style={{ margin: "0 16px 8px", background: "#12121C", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 14, padding: 14, flexShrink: 0 }}
-                >
-                  <div style={{ fontSize: 10, color: "#A78BFA", fontFamily: "monospace", letterSpacing: "1px", marginBottom: 8 }}>⚡ PROMPT ENHANCED</div>
-                  <div style={{ fontSize: 13, color: "#F1F1F1", lineHeight: 1.6, marginBottom: 12 }}>{enhancedPrompt}</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => {
-                      const p = enhancedPrompt!;
-                      setEnhancedPrompt(null);
-                      setInput(p);
-                      setTimeout(() => handleSend(forceAutomate), 0);
-                    }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#A78BFA", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
-                      Use This
-                    </motion.button>
-                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => {
-                      setInput(enhancedPrompt);
-                      setEnhancedPrompt(null);
-                    }} style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", color: "#F59E0B", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
-                      Edit
-                    </motion.button>
-                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => setEnhancedPrompt(null)}
-                      style={{ flex: 1, padding: "7px 0", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#EF4444", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
-                      Cancel
-                    </motion.button>
-                  </div>
-                </motion.div>
               )}
+            </div>
 
-              {/* Input */}
-              <div style={{ padding: "12px 16px 16px", borderTop: "1px solid #1a1a2e", background: "#0A0A14", flexShrink: 0 }}>
-                <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                  {(["easy", "medium", "hard"] as Difficulty[]).map(d => (
-                    <motion.button
-                      key={d}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setDifficulty(d)}
-                      style={{
-                        padding: "3px 10px", borderRadius: 6, fontSize: 10, fontFamily: "monospace", cursor: "pointer", border: "1px solid",
-                        background: difficulty === d ? (d === "hard" ? "rgba(245,158,11,0.15)" : d === "medium" ? "rgba(96,165,250,0.15)" : "rgba(52,211,153,0.15)") : "transparent",
-                        borderColor: difficulty === d ? (d === "hard" ? "rgba(245,158,11,0.5)" : d === "medium" ? "rgba(96,165,250,0.5)" : "rgba(52,211,153,0.5)") : "#1E1E2E",
-                        color: difficulty === d ? (d === "hard" ? "#F59E0B" : d === "medium" ? "#60A5FA" : "#34D399") : "#8888AA",
-                        boxShadow: difficulty === d && d === "hard" ? "0 0 10px rgba(245,158,11,0.2)" : "none",
-                      }}
-                    >
-                      {d}{detected === d && difficulty !== d ? " ●" : ""}
-                    </motion.button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-end", background: "#12121C", border: "1px solid #1E1E2E", borderRadius: 14, padding: "10px 14px" }}>
-                  <textarea
-                    value={input}
-                    onChange={e => { handleInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnhance(); } }}
-                    placeholder="Ask Nexus anything..."
-                    rows={1}
-                    style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "#F1F1F1", fontSize: 14, fontFamily: "Geist, sans-serif", resize: "none", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}
-                  />
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={handleAutomate}
-                    disabled={!input.trim() || loading || enhancing}
-                    style={{ background: input.trim() && !loading ? "rgba(96,165,250,0.15)" : "transparent", border: "1px solid", borderColor: input.trim() && !loading ? "rgba(96,165,250,0.4)" : "#1E1E2E", borderRadius: 8, padding: "0 10px", height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", transition: "all 0.2s", flexShrink: 0 }}
-                  >
-                    <span style={{ fontSize: 10, fontFamily: "monospace", color: input.trim() && !loading ? "#60A5FA" : "#8888AA", whiteSpace: "nowrap" }}>⚡ Auto</span>
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.85 }}
-                    onClick={handleEnhance}
-                    disabled={!input.trim() || loading || enhancing}
-                    style={{ background: input.trim() && !loading && !enhancing ? "#F59E0B" : "#1E1E2E", border: "none", borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: input.trim() ? "pointer" : "default", transition: "all 0.2s", flexShrink: 0 }}
-                  >
-                    <Send size={14} color={input.trim() && !loading && !enhancing ? "#000" : "#8888AA"} />
-                  </motion.button>
+            {/* Pending script bar */}
+            {pendingScript && !showSaveInput && (
+              <div style={{
+                margin: "0 12px 6px",
+                padding: "8px 12px",
+                background: "rgba(245,158,11,0.06)",
+                border: "1px solid rgba(245,158,11,0.2)",
+                borderRadius: 8,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 10, color: "#92400E", fontFamily: "inherit", letterSpacing: "0.5px" }}>
+                  📄 {pendingScript.filepath.split("/").pop()}
+                </span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setShowSaveInput(true)} style={{
+                    fontSize: 9, padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(245,158,11,0.3)",
+                    background: "rgba(245,158,11,0.1)", color: "#F59E0B", cursor: "pointer", fontFamily: "inherit",
+                  }}>SAVE</button>
+                  <button onClick={async () => {
+                    await fetch("/api/nexus", { method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ endpoint: "delete-script", filepath: pendingScript.filepath }) });
+                    setPendingScript(null);
+                  }} style={{
+                    fontSize: 9, padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(239,68,68,0.3)",
+                    background: "rgba(239,68,68,0.08)", color: "#EF4444", cursor: "pointer", fontFamily: "inherit",
+                  }}>DELETE</button>
                 </div>
               </div>
-            </motion.div>
-          )}
+            )}
 
-          {/* PROJECTS TAB */}
-          {tab === "projects" && (
-            <motion.div key="projects" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} style={{ height: "100%", overflowY: "auto", padding: 16 }}>
-              <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", letterSpacing: "2px", marginBottom: 16, textTransform: "uppercase" }}>
-                Shikamaru Watching
+            {showSaveInput && pendingScript && (
+              <div style={{
+                margin: "0 12px 6px", padding: "8px 12px",
+                background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)",
+                borderRadius: 8, display: "flex", gap: 6, flexShrink: 0,
+              }}>
+                <input
+                  value={saveName} onChange={e => setSaveName(e.target.value)}
+                  placeholder="Name this automation..."
+                  style={{
+                    flex: 1, background: "transparent", border: "none", outline: "none",
+                    color: "#C4C4E8", fontSize: 11, fontFamily: "inherit",
+                  }}
+                />
+                <button onClick={() => {
+                  if (!saveName.trim()) return;
+                  const newAuto: SavedAutomation = {
+                    id: crypto.randomUUID(), name: saveName,
+                    prompt: pendingScript.prompt, filepath: pendingScript.filepath,
+                    createdAt: new Date().toISOString(),
+                  };
+                  setSavedAutomations(prev => [...prev, newAuto]);
+                  setPendingScript(null); setShowSaveInput(false); setSaveName("");
+                }} style={{
+                  fontSize: 9, padding: "3px 10px", borderRadius: 5,
+                  border: "1px solid rgba(124,58,237,0.4)",
+                  background: "rgba(124,58,237,0.15)", color: "#A78BFA",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>SAVE</button>
+                <button onClick={() => { setShowSaveInput(false); setSaveName(""); }} style={{
+                  fontSize: 9, padding: "3px 8px", borderRadius: 5,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "transparent", color: "#4A4A7A",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>✕</button>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {INITIAL_PROJECTS.map(p => (
-                  <motion.div
-                    key={p.id}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setSelectedProject(p.id === selectedProject ? null : p.id)}
-                    style={{
-                      background: "#12121C", borderRadius: 14, padding: 16, cursor: "pointer",
-                      border: `1px solid ${selectedProject === p.id ? "#F59E0B44" : "#1E1E2E"}`,
-                      boxShadow: selectedProject === p.id ? "0 0 16px rgba(245,158,11,0.1)" : "none",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 16, fontWeight: 600, color: "#F1F1F1" }}>{p.name}</span>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
-                    </div>
-                    <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", marginBottom: 4 }}>{p.repo}</div>
-                    <div style={{ fontSize: 12, color: "#8888AA" }}>{p.lastCommit}</div>
-                  </motion.div>
+            )}
+
+            {/* Input area */}
+            <div style={{
+              padding: "8px 12px 12px", flexShrink: 0,
+              borderTop: "1px solid rgba(124,58,237,0.1)",
+              background: "rgba(5,5,8,0.6)", backdropFilter: "blur(20px)",
+            }}>
+              {/* Difficulty selector */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                {(["easy","medium","hard"] as Difficulty[]).map(d => (
+                  <button key={d} onClick={() => setDifficulty(d)} style={{
+                    padding: "3px 10px", borderRadius: 5, border: "none", cursor: "pointer",
+                    fontSize: 9, fontFamily: "inherit", letterSpacing: "1px",
+                    background: difficulty === d ? `${DIFF_COLOR[d]}20` : "transparent",
+                    color: difficulty === d ? DIFF_COLOR[d] : "#2D2D5E",
+                    borderBottom: difficulty === d ? `1px solid ${DIFF_COLOR[d]}` : "1px solid transparent",
+                    transition: "all 0.15s",
+                  }}>{d.toUpperCase()}</button>
                 ))}
+                <div style={{ flex: 1 }} />
+                <button onClick={() => setForceAutomate(v => !v)} style={{
+                  padding: "3px 10px", borderRadius: 5, border: "none", cursor: "pointer",
+                  fontSize: 9, fontFamily: "inherit", letterSpacing: "1px",
+                  background: forceAutomate ? "rgba(6,182,212,0.15)" : "transparent",
+                  color: forceAutomate ? "#06B6D4" : "#2D2D5E",
+                  borderBottom: forceAutomate ? "1px solid #06B6D4" : "1px solid transparent",
+                  transition: "all 0.15s",
+                }}>⚡ AUTO</button>
               </div>
-              <div style={{ marginTop: 24 }}>
-                <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", letterSpacing: "2px", textTransform: "uppercase", marginBottom: 12 }}>Saved Automations</div>
-                {savedAutomations.length === 0 && (
-                  <div style={{ fontSize: 12, color: "#8888AA", fontFamily: "monospace" }}>None saved yet</div>
-                )}
+
+              {/* Text input row */}
+              <div style={{
+                display: "flex", gap: 8, alignItems: "flex-end",
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(124,58,237,0.2)",
+                borderRadius: 12, padding: "8px 10px",
+              }}>
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={e => { setInput(e.target.value); autoResize(); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(forceAutomate); }
+                  }}
+                  placeholder="Ask anything..."
+                  rows={1}
+                  style={{
+                    flex: 1, background: "transparent", border: "none", outline: "none",
+                    color: "#E8E8F8", fontSize: 13, fontFamily: "inherit",
+                    resize: "none", lineHeight: 1.5, maxHeight: 120,
+                    overflowY: "auto",
+                  }}
+                />
+                <button
+                  onClick={() => handleSend(forceAutomate)}
+                  disabled={!input.trim() || loading}
+                  style={{
+                    width: 34, height: 34, borderRadius: 8, border: "none",
+                    background: input.trim() && !loading
+                      ? "linear-gradient(135deg, #7C3AED, #5B21B6)"
+                      : "rgba(255,255,255,0.05)",
+                    color: input.trim() && !loading ? "#fff" : "#2D2D5E",
+                    cursor: input.trim() && !loading ? "pointer" : "default",
+                    fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: input.trim() && !loading ? "0 0 16px rgba(124,58,237,0.4)" : "none",
+                    transition: "all 0.2s", flexShrink: 0,
+                  }}>
+                  →
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── PROJECTS TAB ── */}
+        {tab === "projects" && (
+          <motion.div key="projects"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ height: "100%", overflowY: "auto", padding: "16px 12px" }}>
+
+            <div style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "2px", marginBottom: 14 }}>ACTIVE REPOS</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {projects.map(p => (
+                <div key={p.id} style={{
+                  padding: "12px 14px",
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(124,58,237,0.15)",
+                  borderRadius: 10,
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#C4C4E8", marginBottom: 2 }}>{p.name}</div>
+                    <div style={{ fontSize: 10, color: "#4A4A7A" }}>{p.lastCommit}</div>
+                  </div>
+                  <div style={{
+                    fontSize: 8, padding: "2px 8px", borderRadius: 4, letterSpacing: "1px",
+                    background: p.status === "active" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.05)",
+                    color: p.status === "active" ? "#10B981" : "#4A4A7A",
+                    border: `1px solid ${p.status === "active" ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.05)"}`,
+                  }}>{p.status.toUpperCase()}</div>
+                </div>
+              ))}
+            </div>
+
+            {savedAutomations.length > 0 && (
+              <>
+                <div style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "2px", marginBottom: 12 }}>SAVED AUTOMATIONS</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {savedAutomations.map(a => (
-                    <motion.div
-                      key={a.id}
-                      style={{ background: "#12121C", borderRadius: 12, padding: 12, border: "1px solid #1E1E2E" }}
-                    >
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => { setInput(a.prompt); setTab("chat"); }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F1F1", marginBottom: 4 }}>{a.name}</div>
-                          <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.prompt}</div>
-                          <div style={{ fontSize: 10, color: "#F59E0B", fontFamily: "monospace", marginTop: 4 }}>tap to rerun</div>
-                        </div>
-                        <button
-                          onClick={() => setSavedAutomations(prev => prev.filter(x => x.id !== a.id))}
-                          style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 16, padding: "0 2px", flexShrink: 0, lineHeight: 1 }}
-                        >✕</button>
+                    <div key={a.id} style={{
+                      padding: "10px 14px",
+                      background: "rgba(6,182,212,0.04)",
+                      border: "1px solid rgba(6,182,212,0.12)",
+                      borderRadius: 10,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#06B6D4", marginBottom: 2 }}>{a.name}</div>
+                        <div style={{ fontSize: 10, color: "#4A4A7A" }}>{a.prompt.slice(0, 48)}…</div>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ACTIVITY TAB */}
-          {tab === "activity" && (
-            <motion.div key="activity" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} style={{ height: "100%", overflowY: "auto", padding: 16 }}>
-              <div style={{ fontSize: 11, color: "#8888AA", fontFamily: "monospace", letterSpacing: "2px", marginBottom: 16, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#F59E0B", animation: "pulse 1s infinite" }} />
-                Agent Activity
-              </div>
-              {activities.length === 0 && (
-                <div style={{ textAlign: "center", color: "#8888AA", fontSize: 12, fontFamily: "monospace", marginTop: 40 }}>— awaiting tasks —</div>
-              )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {activities.map(a => (
-                  <motion.div
-                    key={a.id}
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{ background: "#12121C", border: "1px solid #1E1E2E", borderRadius: 12, padding: 12 }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span>{PROVIDER_ICONS[a.provider] ?? "🤖"}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#F1F1F1", textTransform: "capitalize" }}>{a.provider.replace("_", " ")}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{
-                          width: 6, height: 6, borderRadius: "50%",
-                          background: a.status === "done" ? "#10B981" : a.status === "failed" ? "#EF4444" : a.status === "thinking" ? "#F59E0B" : "#8888AA",
-                          animation: a.status === "thinking" ? "pulse 1s infinite" : "none",
-                        }} />
-                        <span style={{ fontSize: 11, fontFamily: "monospace", color: a.status === "done" ? "#10B981" : a.status === "failed" ? "#EF4444" : a.status === "thinking" ? "#F59E0B" : "#8888AA" }}>
-                          {a.status}
-                        </span>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button onClick={() => { setTab("chat"); handleSend(true, a.prompt); }} style={{
+                          fontSize: 9, padding: "3px 8px", borderRadius: 5,
+                          border: "1px solid rgba(6,182,212,0.3)",
+                          background: "rgba(6,182,212,0.1)", color: "#06B6D4",
+                          cursor: "pointer", fontFamily: "inherit",
+                        }}>▶ RUN</button>
+                        <button onClick={() => setSavedAutomations(prev => prev.filter(x => x.id !== a.id))} style={{
+                          fontSize: 10, width: 22, height: 22, borderRadius: 5,
+                          border: "1px solid rgba(239,68,68,0.2)",
+                          background: "rgba(239,68,68,0.06)", color: "#EF4444",
+                          cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>✕</button>
                       </div>
                     </div>
-                    <div style={{ fontSize: 11, color: "#8888AA", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.task}</div>
-                    {a.responseTime && (
-                      <div style={{ fontSize: 10, color: "#8888AA", fontFamily: "monospace" }}>{a.responseTime}ms</div>
-                    )}
-                  </motion.div>
+                  ))}
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── ACTIVITY TAB ── */}
+        {tab === "activity" && (
+          <motion.div key="activity"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ height: "100%", overflowY: "auto", padding: "16px 12px" }}>
+            <div style={{ fontSize: 9, color: "#4A4A7A", letterSpacing: "2px", marginBottom: 14 }}>SYSTEM ACTIVITY</div>
+            {messages.filter(m => m.role === "assistant").length === 0 ? (
+              <div style={{ color: "#2D2D5E", fontSize: 11, textAlign: "center", marginTop: 40 }}>
+                No activity yet.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {messages.filter(m => m.role === "assistant").map((m, i) => (
+                  <div key={m.id} style={{
+                    padding: "8px 12px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(124,58,237,0.1)",
+                    borderRadius: 8,
+                    display: "flex", alignItems: "center", gap: 10,
+                  }}>
+                    <span style={{ fontSize: 14 }}>{PROVIDER_ICONS[m.provider ?? ""] ?? "🤖"}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: "#6868A8", marginBottom: 2 }}>{m.provider?.toUpperCase()}</div>
+                      <div style={{ fontSize: 11, color: "#4A4A7A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {m.content.startsWith("__IMAGE__") ? "🖼 Image generated" : m.content.slice(0, 60)}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 9, color: "#2D2D5E", flexShrink: 0 }}>
+                      {m.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
                 ))}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            )}
+          </motion.div>
+        )}
 
-      {/* Bottom nav */}
-      <div style={{ display: "flex", borderTop: "1px solid #1a1a2e", background: "#0A0A14", flexShrink: 0 }}>
-        {([
-          { id: "chat", icon: MessageSquare, label: "Chat" },
-          { id: "projects", icon: FolderOpen, label: "Projects" },
-          { id: "activity", icon: Activity, label: "Activity" },
-        ] as { id: Tab; icon: any; label: string }[]).map(({ id, icon: Icon, label }) => (
-          <motion.button
-            key={id}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setTab(id)}
-            style={{
-              flex: 1, padding: "12px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-              background: "transparent", border: "none", cursor: "pointer",
-              borderTop: tab === id ? "2px solid #F59E0B" : "2px solid transparent",
-            }}
-          >
-            <Icon size={18} color={tab === id ? "#F59E0B" : "#8888AA"} />
-            <span style={{ fontSize: 10, fontFamily: "monospace", color: tab === id ? "#F59E0B" : "#8888AA", letterSpacing: "0.5px" }}>
-              {label}
-            </span>
-          </motion.button>
-        ))}
+        </AnimatePresence>
       </div>
     </div>
   );
