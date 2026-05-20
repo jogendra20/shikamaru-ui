@@ -109,8 +109,24 @@ export default function Home() {
   const [savedAutomations, setSavedAutomations] = useState<SavedAutomation[]>([]);
   const [forceAutomate, setForceAutomate] = useState(false);
   const [projects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [tickerItems, setTickerItems] = useState<string[]>([
+    "NIFTY 50  — ", "SENSEX  — ", "BANKNIFTY  — ", "USDINR  — "
+  ]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const fetchTicker = async () => {
+      try {
+        const res = await fetch("https://nexus-56tm.onrender.com/ticker");
+        const data = await res.json();
+        if (data.items?.length) setTickerItems(data.items);
+      } catch {}
+    };
+    fetchTicker();
+    const interval = setInterval(fetchTicker, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem("savedAutomations");
@@ -122,7 +138,12 @@ export default function Home() {
   }, [savedAutomations]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = document.getElementById("chat-scroll");
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (isNearBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, loading]);
 
   const autoResize = useCallback(() => {
@@ -284,7 +305,7 @@ export default function Home() {
     }
   `;
 
-  const TICKER_ITEMS = ["NIFTY 50  ▲ 0.42%", "SENSEX  ▲ 0.38%", "BANKNIFTY  ▼ 0.11%", "RELIANCE  ▲ 1.2%", "TCS  ▲ 0.8%", "INFY  ▼ 0.3%", "HDFC  ▲ 0.5%"];
+  // tickerItems loaded from Nexus /ticker endpoint
 
   return (
     <div style={{
@@ -330,7 +351,7 @@ export default function Home() {
           display: "flex", gap: 40, whiteSpace: "nowrap",
           animation: "ticker 20s linear infinite",
         }}>
-          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+          {[...tickerItems, ...tickerItems].map((item, i) => (
             <span key={i} style={{
               fontSize: 9, letterSpacing: "1.5px", color: "#D97706", fontFamily: "inherit",
             }}>
