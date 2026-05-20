@@ -140,14 +140,17 @@ export default function Home() {
     localStorage.setItem("savedAutomations", JSON.stringify(savedAutomations));
   }, [savedAutomations]);
 
+  const msgCount = messages.length;
   useEffect(() => {
+    // Only scroll on new message, not on loading state change
+    if (msgCount === 0) return;
     const el = document.getElementById("chat-scroll");
     if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
     if (isNearBottom) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, loading]);
+  }, [msgCount]);
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
