@@ -121,7 +121,7 @@ export default function Home() {
   }, [savedAutomations]);
 
   const pollOutput = async (runId: string, msgId: string) => {
-    const maxAttempts = 24; // 2 mins
+    const maxAttempts = 24;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 5000));
       try {
@@ -135,12 +135,8 @@ export default function Home() {
           const emoji = data.status === "done" ? "✅" : "❌";
           const body = data.image_b64
             ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}`
-            : `${emoji} ${data.status.toUpperCase()}
-
-${data.output ?? "No output"}`;
-          setMessages(prev => prev.map(m =>
-            m.id === msgId ? { ...m, content: body } : m
-          ));
+            : `${emoji} ${data.status.toUpperCase()}\n\n${data.output ?? "No output"}`;
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: body } : m));
           return;
         }
       } catch { /* keep polling */ }
@@ -171,9 +167,7 @@ ${data.output ?? "No output"}`;
 
     try {
       const isImage = IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k));
-
-      const isAutomation = !isImage && (forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"]
-        .some(k => prompt.toLowerCase().includes(k)));
+      const isAutomation = !isImage && (forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"].some(k => prompt.toLowerCase().includes(k)));
 
       const start = Date.now();
       const res = await fetch("/api/nexus", {
@@ -200,10 +194,6 @@ ${data.output ?? "No output"}`;
       if (isAutomation && scriptFile) {
         setPendingScript({ filepath: scriptFile, prompt });
       }
-      // Start polling for output
-      const runId = data.run_id ?? null;
-      let pollingMsgId: string | null = null;
-      const imageUrl = isImage ? (data.image_url ?? data.image_b64 ?? null) : null;
       const content = isImage
         ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
         : isAutomation
@@ -216,18 +206,13 @@ ${data.output ?? "No output"}`;
         isCode: content.includes("def ") || content.includes("import "),
       }]);
 
-      // Poll for automation output
       if (isAutomation && data.run_id) {
-        const automationMsgId = crypto.randomUUID();
         setMessages(prev => {
-          const last = [...prev];
-          const idx = last.findIndex(m => m.content.startsWith("⏳ Running"));
-          if (idx !== -1) { pollingMsgId = last[idx].id; }
-          return last;
+          const msgs = [...prev];
+          const idx = msgs.findLastIndex(m => m.role === "assistant");
+          if (idx !== -1) { setTimeout(() => pollOutput(data.run_id, msgs[idx].id), 100); }
+          return msgs;
         });
-        setTimeout(() => {
-          if (pollingMsgId) pollOutput(data.run_id, pollingMsgId);
-        }, 100);
       }
     } catch {
       addActivity({
@@ -334,21 +319,8 @@ ${data.output ?? "No output"}`;
                         }}>
                           {m.role === "assistant" && m.content.startsWith("__IMAGE__") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                              <img
-                                src={m.content.replace("__IMAGE__", "")}
-                                alt="Generated"
-                                style={{ maxWidth: "100%", borderRadius: 10 }}
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                              />
-                              <a
-                                href={m.content.replace("__IMAGE__", "")}
-                                download="nexus-image.jpg"
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "#F59E0B", fontSize: 11, fontFamily: "monospace", textDecoration: "none", width: "fit-content" }}
-                              >
-                                ⬇ Download
-                              </a>
+                              <img src={m.content.replace("__IMAGE__", "")} alt="Generated" style={{ maxWidth: "100%", borderRadius: 10 }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                              <a href={m.content.replace("__IMAGE__", "")} download="nexus-image.jpg" target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "#F59E0B", fontSize: 11, fontFamily: "monospace", textDecoration: "none", width: "fit-content" }}>⬇ Download</a>
                             </div>
                           ) : m.role === "assistant" ? m.content.split("\n").map((line: string, i: number) => {
                             if (line.startsWith("🧠 Think:")) return (
