@@ -455,9 +455,7 @@ export default function Home() {
 
         {/* ── CHAT TAB ── */}
         {tab === "chat" && (
-          <motion.div key="chat"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", height: "100%" }}>
 
             {/* Messages */}
             <div id="chat-scroll" style={{
@@ -759,7 +757,7 @@ export default function Home() {
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* ── PROJECTS TAB ── */}
