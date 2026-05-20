@@ -7,8 +7,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { endpoint, ...payload } = body;
 
+  const endpointMap: Record<string, string> = {
+    "ask":           "ask",
+    "deploy":        "deploy",
+    "enhance":       "enhance",
+    "fix":           "fix",
+    "delete-script": "delete-script",
+    "image":         "image",
+    "result":        "result",
+  };
+
+  const target = endpointMap[endpoint] ?? endpoint;
+
   try {
-    const res = await fetch(`${NEXUS_URL}/${endpoint === "delete-script" ? "delete-script" : endpoint}`, {
+    const res = await fetch(`${NEXUS_URL}/${target}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

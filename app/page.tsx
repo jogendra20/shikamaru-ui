@@ -9,6 +9,8 @@ const PROVIDER_ICONS: Record<string, string> = {
   github_models: "🔮", cerebras: "⚡", openrouter: "🌐", huggingface: "🤗", nexus: "🎯",
 };
 
+const IMAGE_KEYWORDS = ["generate image","create image","draw","make image","imagine","sketch","paint","visualize"];
+
 const INITIAL_PROJECTS: Project[] = [
   { id: "onyx", name: "Onyx", repo: "jogendra20/onyx", status: "active", lastCommit: "PWA reading app" },
   { id: "hunter", name: "HUNTER", repo: "jogendra20/hunter", status: "active", lastCommit: "NSE journal tool" },
@@ -138,7 +140,9 @@ export default function Home() {
     });
 
     try {
-      const isAutomation = forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"]
+      const isImage = IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k));
+
+      const isAutomation = !isImage && (forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"]
         .some(k => prompt.toLowerCase().includes(k));
 
       const start = Date.now();
@@ -146,7 +150,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: isAutomation ? "deploy" : "ask",
+          endpoint: isImage ? "image" : isAutomation ? "deploy" : "ask",
           prompt,
           task: isAutomation ? "automation" : undefined,
           difficulty,
@@ -166,8 +170,11 @@ export default function Home() {
       if (isAutomation && scriptFile) {
         setPendingScript({ filepath: scriptFile, prompt });
       }
-      const content = isAutomation
-        ? `Automation queued\n\nProvider: ${provider}\nDifficulty: ${difficulty}\n\nCheck Telegram for output.`
+      const imageUrl = isImage ? (data.image_url ?? null) : null;
+      const content = isImage
+        ? (data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
+        : isAutomation
+        ? `Automation queued\n\nProvider: ${provider}\nDifficulty: ${difficulty}\n\nScript running — output will appear here.`
         : data.response ?? data.error ?? "No response";
 
       setMessages(prev => [...prev, {
@@ -278,7 +285,14 @@ export default function Home() {
                           border: m.role === "assistant" ? "1px solid #1E1E2E" : "none",
                           wordBreak: "break-word",
                         }}>
-                          {m.role === "assistant" ? m.content.split("\n").map((line: string, i: number) => {
+                          {m.role === "assistant" && m.content.startsWith("__IMAGE__") ? (
+                            <img
+                              src={m.content.replace("__IMAGE__", "")}
+                              alt="Generated"
+                              style={{ maxWidth: "100%", borderRadius: 10, marginTop: 4 }}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : m.role === "assistant" ? m.content.split("\n").map((line: string, i: number) => {
                             if (line.startsWith("🧠 Think:")) return (
                               <div key={i} style={{ color: "#A78BFA", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(167,139,250,0.08)", borderRadius: 6, borderLeft: "2px solid #A78BFA" }}>{line}</div>
                             );
