@@ -118,10 +118,13 @@ export default function Home() {
   useEffect(() => {
     const fetchTicker = async () => {
       try {
-        const res = await fetch("https://nexus-56tm.onrender.com/ticker");
+        const res = await fetch("https://nexus-56tm.onrender.com/ticker", { signal: AbortSignal.timeout(15000) });
         const data = await res.json();
         if (data.items?.length) setTickerItems(data.items);
-      } catch {}
+      } catch {
+        // retry in 10s if failed (Render cold start)
+        setTimeout(fetchTicker, 10000);
+      }
     };
     fetchTicker();
     const interval = setInterval(fetchTicker, 60000);
@@ -351,7 +354,7 @@ export default function Home() {
           display: "flex", gap: 40, whiteSpace: "nowrap",
           animation: "ticker 20s linear infinite",
         }}>
-          {[...tickerItems, ...tickerItems].map((item, i) => (
+          {[...(tickerItems.some(t => t.includes("%")) ? tickerItems : ["LOADING MARKET DATA..."]), ...(tickerItems.some(t => t.includes("%")) ? tickerItems : ["LOADING MARKET DATA..."])].map((item, i) => (
             <span key={i} style={{
               fontSize: 9, letterSpacing: "1.5px", color: "#D97706", fontFamily: "inherit",
             }}>
