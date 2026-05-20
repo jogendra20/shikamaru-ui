@@ -9,7 +9,7 @@ const PROVIDER_ICONS: Record<string, string> = {
   github_models: "🔮", cerebras: "⚡", openrouter: "🌐", huggingface: "🤗", nexus: "🎯",
 };
 
-const IMAGE_KEYWORDS = ["generate image","create image","draw","make image","imagine","sketch","paint","visualize"];
+const IMAGE_KEYWORDS = ["generate image","create image","draw","make image","imagine","sketch","paint","visualize","want an image","need an image","image for","make a poster","create a poster","poster for","an image of","a picture of","photo of","render a","design a","illustration"];
 
 const INITIAL_PROJECTS: Project[] = [
   { id: "onyx", name: "Onyx", repo: "jogendra20/onyx", status: "active", lastCommit: "PWA reading app" },
@@ -166,15 +166,33 @@ export default function Home() {
     });
 
     try {
-      const isImage = IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k));
-      const isAutomation = !isImage && (forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"].some(k => prompt.toLowerCase().includes(k)));
+      // Intent classification — LLM decides routing
+      let intent = "ask";
+      if (forceAuto || forceAutomate) {
+        intent = "automation";
+      } else {
+        try {
+          const intentRes = await fetch("/api/nexus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: "classify", prompt }),
+          });
+          const intentData = await intentRes.json();
+          intent = intentData.intent ?? "ask";
+        } catch {
+          // fallback: keyword check
+          intent = ["draw","image","poster","render","paint","sketch"].some(k => prompt.toLowerCase().includes(k)) ? "image" : "ask";
+        }
+      }
+      const isImage = intent === "image";
+      const isAutomation = intent === "automation";
 
       const start = Date.now();
       const res = await fetch("/api/nexus", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: isImage ? "image" : isAutomation ? "deploy" : "ask",
+          endpoint: intent === "image" ? "image" : intent === "automation" ? "deploy" : intent === "search" ? "ask" : "ask",
           prompt,
           task: isAutomation ? "automation" : undefined,
           difficulty,
