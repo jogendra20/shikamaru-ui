@@ -170,9 +170,9 @@ export default function Home() {
       if (isAutomation && scriptFile) {
         setPendingScript({ filepath: scriptFile, prompt });
       }
-      const imageUrl = isImage ? (data.image_url ?? null) : null;
+      const imageUrl = isImage ? (data.image_url ?? data.image_b64 ?? null) : null;
       const content = isImage
-        ? (data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
+        ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
         : isAutomation
         ? `Automation queued\n\nProvider: ${provider}\nDifficulty: ${difficulty}\n\nScript running — output will appear here.`
         : data.response ?? data.error ?? "No response";
