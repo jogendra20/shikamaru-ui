@@ -254,9 +254,11 @@ export default function Home() {
       if (isAutomation) {
         const scriptFile = data.file ?? null;
         if (scriptFile) setPendingScript({ filepath: scriptFile, prompt });
-        if (data.run_id) {
+        // Use filename as run_id since GitHub Actions dispatch doesn't return run_id
+        const runId = data.run_id ?? scriptFile?.replace("scripts/","").replace(".py","") ?? null;
+        if (runId) {
           const mid = assistantMsg.id;
-          setTimeout(() => pollOutput(data.run_id, mid), 5000);
+          setTimeout(() => pollOutput(runId, mid), 8000);
         }
       }
 
@@ -448,19 +450,21 @@ export default function Home() {
       </div>
 
       {/* Main content */}
-      <div style={{ flex: 1, position: "relative", zIndex: 5, minHeight: 0, overflow: "hidden" }}>
+      <div style={{ flex: 1, position: "relative", zIndex: 5, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <AnimatePresence mode="wait">
 
         {/* ── CHAT TAB ── */}
         {tab === "chat" && (
           <motion.div key="chat"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
 
             {/* Messages */}
             <div id="chat-scroll" style={{
-              flex: 1, overflowY: "auto", padding: "16px 12px 8px",
+              flex: 1, overflowY: "scroll", padding: "16px 12px 8px",
               WebkitOverflowScrolling: "touch",
+              minHeight: 0,
+              overflowX: "hidden",
             }}>
               {messages.length === 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", height: "100%", paddingTop: 24, gap: 0 }}>
