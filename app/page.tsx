@@ -143,7 +143,7 @@ export default function Home() {
       const isImage = IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k));
 
       const isAutomation = !isImage && (forceAuto || forceAutomate || ["scrape","automate","extract","fill form","playwright","portal","crawl"]
-        .some(k => prompt.toLowerCase().includes(k));
+        .some(k => prompt.toLowerCase().includes(k)));
 
       const start = Date.now();
       const res = await fetch("/api/nexus", {
