@@ -120,6 +120,36 @@ export default function Home() {
     } catch { /* storage full or SSR */ }
   }, [savedAutomations]);
 
+  const pollOutput = async (runId: string, msgId: string) => {
+    const maxAttempts = 24; // 2 mins
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      try {
+        const res = await fetch("/api/nexus", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: "output", run_id: runId }),
+        });
+        const data = await res.json();
+        if (data.status === "done" || data.status === "failed") {
+          const emoji = data.status === "done" ? "✅" : "❌";
+          const body = data.image_b64
+            ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}`
+            : `${emoji} ${data.status.toUpperCase()}
+
+${data.output ?? "No output"}`;
+          setMessages(prev => prev.map(m =>
+            m.id === msgId ? { ...m, content: body } : m
+          ));
+          return;
+        }
+      } catch { /* keep polling */ }
+    }
+    setMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, content: "⏱ Timed out waiting for output." } : m
+    ));
+  };
+
   const handleSend = async (forceAuto: boolean = false) => {
     if (!input.trim() || loading) return;
     const prompt = input.trim();
@@ -170,11 +200,14 @@ export default function Home() {
       if (isAutomation && scriptFile) {
         setPendingScript({ filepath: scriptFile, prompt });
       }
+      // Start polling for output
+      const runId = data.run_id ?? null;
+      let pollingMsgId: string | null = null;
       const imageUrl = isImage ? (data.image_url ?? data.image_b64 ?? null) : null;
       const content = isImage
         ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
         : isAutomation
-        ? `Automation queued\n\nProvider: ${provider}\nDifficulty: ${difficulty}\n\nScript running — output will appear here.`
+        ? `⏳ Running...\n\nProvider: ${provider} · ${difficulty}\n\nFetching output...`
         : data.response ?? data.error ?? "No response";
 
       setMessages(prev => [...prev, {
@@ -182,6 +215,20 @@ export default function Home() {
         task: data.task, difficulty, timestamp: Date.now(),
         isCode: content.includes("def ") || content.includes("import "),
       }]);
+
+      // Poll for automation output
+      if (isAutomation && data.run_id) {
+        const automationMsgId = crypto.randomUUID();
+        setMessages(prev => {
+          const last = [...prev];
+          const idx = last.findIndex(m => m.content.startsWith("⏳ Running"));
+          if (idx !== -1) { pollingMsgId = last[idx].id; }
+          return last;
+        });
+        setTimeout(() => {
+          if (pollingMsgId) pollOutput(data.run_id, pollingMsgId);
+        }, 100);
+      }
     } catch {
       addActivity({
         id: crypto.randomUUID(), provider: "nexus", status: "failed",
@@ -286,12 +333,23 @@ export default function Home() {
                           wordBreak: "break-word",
                         }}>
                           {m.role === "assistant" && m.content.startsWith("__IMAGE__") ? (
-                            <img
-                              src={m.content.replace("__IMAGE__", "")}
-                              alt="Generated"
-                              style={{ maxWidth: "100%", borderRadius: 10, marginTop: 4 }}
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            />
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              <img
+                                src={m.content.replace("__IMAGE__", "")}
+                                alt="Generated"
+                                style={{ maxWidth: "100%", borderRadius: 10 }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                              <a
+                                href={m.content.replace("__IMAGE__", "")}
+                                download="nexus-image.jpg"
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "#F59E0B", fontSize: 11, fontFamily: "monospace", textDecoration: "none", width: "fit-content" }}
+                              >
+                                ⬇ Download
+                              </a>
+                            </div>
                           ) : m.role === "assistant" ? m.content.split("\n").map((line: string, i: number) => {
                             if (line.startsWith("🧠 Think:")) return (
                               <div key={i} style={{ color: "#A78BFA", fontSize: 12, fontFamily: "monospace", marginBottom: 6, padding: "4px 8px", background: "rgba(167,139,250,0.08)", borderRadius: 6, borderLeft: "2px solid #A78BFA" }}>{line}</div>
