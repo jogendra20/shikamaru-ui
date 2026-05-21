@@ -205,22 +205,12 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Intent classification
+      // Intent classification — local first, no LLM call needed
       let intent = "ask";
       if (forceAuto || forceAutomate) {
         intent = "automation";
-      } else {
-        try {
-          const ir = await fetch("/api/nexus", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ endpoint: "classify", prompt }),
-          });
-          const id = await ir.json();
-          intent = id.intent ?? "ask";
-        } catch {
-          intent = IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k)) ? "image" : "ask";
-        }
+      } else if (IMAGE_KEYWORDS.some(k => prompt.toLowerCase().includes(k))) {
+        intent = "image";
       }
 
       const isImage = intent === "image";
