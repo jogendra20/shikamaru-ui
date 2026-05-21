@@ -165,9 +165,9 @@ export default function Home() {
   }, []);
 
   const pollOutput = useCallback(async (runId: string, msgId: string) => {
-    const maxAttempts = 24;
+    const maxAttempts = 36;
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 10000));
       try {
         const res = await fetch("/api/nexus", {
           method: "POST",
@@ -236,7 +236,7 @@ export default function Home() {
       const content = isImage
         ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
         : isAutomation
-        ? `⏳ Running...\n\nProvider: ${provider} · ${finalDiff}\n\nFetching output...`
+        ? `⏳ Running...\n\nProvider: ${provider} · ${finalDiff}\n\nGitHub Actions is setting up (~2 min). Polling every 10s for up to 6 min...`
         : data.response ?? data.error ?? "No response";
 
       const assistantMsg: Message = {
@@ -253,7 +253,7 @@ export default function Home() {
         const runId = data.run_id ?? scriptFile?.replace("scripts/","").replace(".py","") ?? null;
         if (runId) {
           const mid = assistantMsg.id;
-          setTimeout(() => pollOutput(runId, mid), 8000);
+          setTimeout(() => pollOutput(runId, mid), 30000);
         }
       }
 
