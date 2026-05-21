@@ -142,14 +142,19 @@ export default function Home() {
 
   const msgCount = messages.length;
   useEffect(() => {
-    // Only scroll on new message, not on loading state change
     if (msgCount === 0) return;
-    const el = document.getElementById("chat-scroll");
-    if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
-    if (isNearBottom) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    // Defer scroll until after React commits new message to DOM
+    const timer = setTimeout(() => {
+      const el = document.getElementById("chat-scroll");
+      if (!el) return;
+      // Check scroll position BEFORE the new message was added
+      // If user is within 300px of bottom, auto-scroll
+      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distFromBottom < 300) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }, 50);
+    return () => clearTimeout(timer);
   }, [msgCount]);
 
   const autoResize = useCallback(() => {
