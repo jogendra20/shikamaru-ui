@@ -354,7 +354,7 @@ export default function Home() {
           display: "flex", gap: 40, whiteSpace: "nowrap",
           animation: "ticker 20s linear infinite",
         }}>
-          {[...(tickerItems.some(t => t.includes("%")) ? tickerItems : ["LOADING MARKET DATA..."]), ...(tickerItems.some(t => t.includes("%")) ? tickerItems : ["LOADING MARKET DATA..."])].map((item, i) => (
+          {[...tickerItems, ...tickerItems].map((item, i) => (
             <span key={i} style={{
               fontSize: 9, letterSpacing: "1.5px", color: "#D97706", fontFamily: "inherit",
             }}>
