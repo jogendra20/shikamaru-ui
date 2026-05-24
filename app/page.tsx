@@ -131,6 +131,30 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("nexus_messages");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Restore Date objects from ISO strings
+        const restored = parsed.map((m: Message) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
+        setMessages(restored);
+      }
+    } catch { /* ignore corrupt storage */ }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    try {
+      localStorage.setItem("nexus_messages", JSON.stringify(messages));
+    } catch { /* ignore quota errors */ }
+  }, [messages]);
+
   useEffect(() => {
     const stored = localStorage.getItem("savedAutomations");
     if (stored) setSavedAutomations(JSON.parse(stored));
@@ -401,6 +425,20 @@ export default function Home() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => {
+              setMessages([]);
+              localStorage.removeItem("nexus_messages");
+            }}
+            style={{
+              fontSize: 8, padding: "3px 8px", borderRadius: 5,
+              border: "1px solid rgba(245,158,11,0.2)",
+              background: "transparent", color: "#57534E",
+              cursor: "pointer", fontFamily: "inherit",
+              letterSpacing: "1px",
+            }}>
+            CLEAR
+          </button>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 8, color: "#78716C", letterSpacing: "1px" }}>SYSTEM</div>
             <div style={{ fontSize: 9, color: "#F59E0B" }}>ACTIVE</div>
