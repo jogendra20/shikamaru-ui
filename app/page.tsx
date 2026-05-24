@@ -246,7 +246,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: isImage ? "image" : isAutomation ? "deploy" : "ask",
+          endpoint: isImage ? "image" : isAutomation ? "deploy" : "orchestrate",
           prompt,
           task: isAutomation ? "automation" : undefined,
           difficulty: finalDiff,
@@ -257,11 +257,16 @@ export default function Home() {
       const provider = data.provider ?? "nexus";
       const responseTime = Date.now() - start;
 
+      const otype = data.type ?? "text";
       const content = isImage
         ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
         : isAutomation
         ? `⏳ Running...\n\nProvider: ${provider} · ${finalDiff}\n\nGitHub Actions is setting up (~2 min). Polling every 10s for up to 6 min...`
-        : data.response ?? data.error ?? "No response";
+        : otype === "clarify"
+        ? `❓ ${data.content}`
+        : otype === "image"
+        ? `__IMAGE__${data.content}`
+        : data.content ?? data.response ?? data.error ?? "No response";
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(), role: "assistant", content,
