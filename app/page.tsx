@@ -1,4 +1,6 @@
 "use client";
+// @ts-ignore
+import LZString from "lz-string";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,6 +37,86 @@ interface SavedAutomation {
 interface PendingScript {
   filepath: string;
   prompt: string;
+}
+
+// ── Chat types ───────────────────────────────────────────────────
+interface Chat {
+  id: string;
+  title: string;
+  createdAt: string;
+  summary: string;
+}
+
+// ── Storage helpers ───────────────────────────────────────────────
+const CHATS_KEY = "nexus_chats";
+const MAX_STORED_CHATS = 20;
+const SUMMARY_EVERY = 6; // summarize every N messages
+
+function loadChats(): Chat[] {
+  try {
+    const raw = localStorage.getItem(CHATS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveChats(chats: Chat[]) {
+  try {
+    localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+  } catch {}
+}
+
+function loadMessages(chatId: string): Message[] {
+  try {
+    const raw = localStorage.getItem(`nexus_chat_${chatId}`);
+    if (!raw) return [];
+    const decompressed = LZString.decompress(raw);
+    if (!decompressed) return [];
+    const parsed = JSON.parse(decompressed);
+    return parsed.map((m: Message) => ({ ...m, timestamp: new Date(m.timestamp) }));
+  } catch { return []; }
+}
+
+function saveMessages(chatId: string, messages: Message[]) {
+  try {
+    // Never store image content — too large
+    const sanitized = messages.map(m => ({
+      ...m,
+      content: m.content.startsWith("__IMAGE__") ? "__IMAGE__[view in session only]" : m.content
+    }));
+    const compressed = LZString.compress(JSON.stringify(sanitized));
+    localStorage.setItem(`nexus_chat_${chatId}`, compressed);
+  } catch (e: any) {
+    if (e.name === "QuotaExceededError") {
+      // Evict oldest chat
+      const chats = loadChats();
+      if (chats.length > 1) {
+        const oldest = chats[chats.length - 1];
+        localStorage.removeItem(`nexus_chat_${oldest.id}`);
+        saveChats(chats.slice(0, -1));
+        // Retry
+        try {
+          const compressed = LZString.compress(JSON.stringify(sanitized));
+          localStorage.setItem(`nexus_chat_${chatId}`, compressed);
+        } catch {}
+      }
+    }
+  }
+}
+
+function loadSummary(chatId: string): string {
+  try {
+    return localStorage.getItem(`nexus_summary_${chatId}`) ?? "";
+  } catch { return ""; }
+}
+
+function saveSummary(chatId: string, summary: string) {
+  try {
+    localStorage.setItem(`nexus_summary_${chatId}`, summary);
+  } catch {}
+}
+
+function generateChatTitle(firstMessage: string): string {
+  return firstMessage.slice(0, 40) + (firstMessage.length > 40 ? "..." : "");
 }
 
 const PROVIDER_ICONS: Record<string, string> = {
@@ -98,6 +180,9 @@ const DIFF_COLOR: Record<Difficulty, string> = {
 };
 
 export default function Home() {
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string>("");
+  const [showSidebar, setShowSidebar] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -131,29 +216,46 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load messages from localStorage on mount
+  // Load chats on mount, restore last active chat
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("nexus_messages");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Restore Date objects from ISO strings
-        const restored = parsed.map((m: Message) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
-        }));
-        setMessages(restored);
-      }
-    } catch { /* ignore corrupt storage */ }
+    const stored = loadChats();
+    setChats(stored);
+    if (stored.length > 0) {
+      const lastId = stored[0].id;
+      setActiveChatId(lastId);
+      setMessages(loadMessages(lastId));
+    } else {
+      // Create first chat
+      const newChat: Chat = {
+        id: crypto.randomUUID(),
+        title: "New Chat",
+        createdAt: new Date().toISOString(),
+        summary: ""
+      };
+      setChats([newChat]);
+      setActiveChatId(newChat.id);
+      saveChats([newChat]);
+    }
   }, []);
 
-  // Save messages to localStorage whenever they change
+  // Save messages whenever they change
   useEffect(() => {
-    if (messages.length === 0) return;
-    try {
-      localStorage.setItem("nexus_messages", JSON.stringify(messages));
-    } catch { /* ignore quota errors */ }
-  }, [messages]);
+    if (!activeChatId || messages.length === 0) return;
+    saveMessages(activeChatId, messages);
+    // Update chat title from first user message
+    const firstUser = messages.find(m => m.role === "user");
+    if (firstUser) {
+      setChats(prev => {
+        const updated = prev.map(c =>
+          c.id === activeChatId
+            ? { ...c, title: generateChatTitle(firstUser.content) }
+            : c
+        );
+        saveChats(updated);
+        return updated;
+      });
+    }
+  }, [messages, activeChatId]);
 
   useEffect(() => {
     const stored = localStorage.getItem("savedAutomations");
@@ -187,6 +289,44 @@ export default function Home() {
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 120) + "px";
   }, []);
+
+  const newChat = () => {
+    const chat: Chat = {
+      id: crypto.randomUUID(),
+      title: "New Chat",
+      createdAt: new Date().toISOString(),
+      summary: ""
+    };
+    const updated = [chat, ...chats].slice(0, MAX_STORED_CHATS);
+    setChats(updated);
+    saveChats(updated);
+    setActiveChatId(chat.id);
+    setMessages([]);
+    setShowSidebar(false);
+  };
+
+  const switchChat = (chatId: string) => {
+    saveMessages(activeChatId, messages);
+    setActiveChatId(chatId);
+    setMessages(loadMessages(chatId));
+    setShowSidebar(false);
+  };
+
+  const deleteChat = (chatId: string) => {
+    localStorage.removeItem(`nexus_chat_${chatId}`);
+    localStorage.removeItem(`nexus_summary_${chatId}`);
+    const updated = chats.filter(c => c.id !== chatId);
+    saveChats(updated);
+    setChats(updated);
+    if (chatId === activeChatId) {
+      if (updated.length > 0) {
+        setActiveChatId(updated[0].id);
+        setMessages(loadMessages(updated[0].id));
+      } else {
+        newChat();
+      }
+    }
+  };
 
   const pollOutput = useCallback(async (runId: string, msgId: string) => {
     const maxAttempts = 36;
@@ -352,6 +492,51 @@ export default function Home() {
     }}>
       <style>{glowPulse}</style>
 
+      {/* Chat sidebar */}
+      {showSidebar && (
+        <div style={{
+          position: "absolute", top: 0, left: 0, bottom: 0, width: "75%", maxWidth: 280,
+          background: "#0D0D0A", borderRight: "1px solid rgba(245,158,11,0.15)",
+          zIndex: 100, display: "flex", flexDirection: "column",
+          overflowY: "auto", padding: "12px 0",
+        }}>
+          <div style={{ padding: "0 14px 10px", fontSize: 9, color: "#57534E", letterSpacing: "2px" }}>
+            CHATS ({chats.length})
+          </div>
+          {chats.map(c => (
+            <div key={c.id} onClick={() => switchChat(c.id)} style={{
+              padding: "10px 14px", cursor: "pointer",
+              background: c.id === activeChatId ? "rgba(245,158,11,0.08)" : "transparent",
+              borderLeft: c.id === activeChatId ? "2px solid #F59E0B" : "2px solid transparent",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              transition: "all 0.15s",
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: c.id === activeChatId ? "#F59E0B" : "#78716C",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.title}
+                </div>
+                <div style={{ fontSize: 9, color: "#44403C", marginTop: 2 }}>
+                  {new Date(c.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); deleteChat(c.id); }} style={{
+                fontSize: 10, width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                border: "none", background: "transparent", color: "#44403C",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Sidebar backdrop */}
+      {showSidebar && (
+        <div onClick={() => setShowSidebar(false)} style={{
+          position: "absolute", inset: 0, zIndex: 99,
+          background: "rgba(0,0,0,0.5)",
+        }} />
+      )}
+
       {/* Noise texture overlay */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0, opacity: 0.025,
@@ -430,20 +615,20 @@ export default function Home() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={() => {
-              setMessages([]);
-              localStorage.removeItem("nexus_messages");
-            }}
-            style={{
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={newChat} style={{
+              fontSize: 8, padding: "3px 8px", borderRadius: 5,
+              border: "1px solid rgba(245,158,11,0.3)",
+              background: "rgba(245,158,11,0.08)", color: "#F59E0B",
+              cursor: "pointer", fontFamily: "inherit", letterSpacing: "1px",
+            }}>+ NEW</button>
+            <button onClick={() => setShowSidebar(v => !v)} style={{
               fontSize: 8, padding: "3px 8px", borderRadius: 5,
               border: "1px solid rgba(245,158,11,0.2)",
               background: "transparent", color: "#57534E",
-              cursor: "pointer", fontFamily: "inherit",
-              letterSpacing: "1px",
-            }}>
-            CLEAR
-          </button>
+              cursor: "pointer", fontFamily: "inherit", letterSpacing: "1px",
+            }}>CHATS</button>
+          </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 8, color: "#78716C", letterSpacing: "1px" }}>SYSTEM</div>
             <div style={{ fontSize: 9, color: "#F59E0B" }}>ACTIVE</div>
