@@ -77,25 +77,23 @@ function loadMessages(chatId: string): Message[] {
 }
 
 function saveMessages(chatId: string, messages: Message[]) {
+  // Never store image content — too large
+  const sanitized = messages.map(m => ({
+    ...m,
+    content: m.content.startsWith("__IMAGE__") ? "__IMAGE__[view in session only]" : m.content
+  }));
+  const compressed = LZString.compress(JSON.stringify(sanitized));
   try {
-    // Never store image content — too large
-    const sanitized = messages.map(m => ({
-      ...m,
-      content: m.content.startsWith("__IMAGE__") ? "__IMAGE__[view in session only]" : m.content
-    }));
-    const compressed = LZString.compress(JSON.stringify(sanitized));
     localStorage.setItem(`nexus_chat_${chatId}`, compressed);
   } catch (e: any) {
     if (e.name === "QuotaExceededError") {
-      // Evict oldest chat
+      // Evict oldest chat and retry
       const chats = loadChats();
       if (chats.length > 1) {
         const oldest = chats[chats.length - 1];
         localStorage.removeItem(`nexus_chat_${oldest.id}`);
         saveChats(chats.slice(0, -1));
-        // Retry
         try {
-          const compressed = LZString.compress(JSON.stringify(sanitized));
           localStorage.setItem(`nexus_chat_${chatId}`, compressed);
         } catch {}
       }
