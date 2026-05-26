@@ -556,7 +556,7 @@ export default function Home() {
       {/* Tabs */}
       <div style={{ display: "flex", padding: "0 14px",
         borderBottom: "1px solid #1E1E2E", background: "#0A0A0F", flexShrink: 0 }}>
-        {([["chat","◈","CHAT"],["projects","◉","PROJECTS"],["activity","◎","ACTIVITY"]] as const).map(([id,icon,label]) => (
+        {([["chat","◈","CHAT"],["projects","◉","PROJECTS"],["activity","◎","ACTIVITY"],["osint","◈","OSINT"]] as const).map(([id,icon,label]) => (
           <button key={id} onClick={() => setTab(id as Tab)} style={{
             padding: "7px 12px 6px", border: "none", cursor: "pointer",
             fontSize: 9, fontFamily: "inherit", letterSpacing: "2px",
