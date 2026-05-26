@@ -1,4 +1,5 @@
 "use client";
+import OSINTPanel from "@/components/OSINTPanel";
 // @ts-ignore
 import LZString from "lz-string";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -6,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 type Role = "user" | "assistant";
 type Difficulty = "easy" | "medium" | "hard";
-type Tab = "chat" | "projects" | "activity";
+type Tab = "chat" | "projects" | "activity" | "osint";
 
 interface Message {
   id: string;
@@ -779,6 +780,10 @@ export default function Home() {
               </>
             )}
           </div>
+        )}
+
+        {tab === "osint" && (
+          <OSINTPanel />
         )}
 
         {tab === "activity" && (
