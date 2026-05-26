@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const NEXUS_URL = process.env.NEXUS_URL ?? "https://nexus-56tm.onrender.com"\;
+const NEXUS_URL = process.env.NEXUS_URL ?? "https://nexus-56tm.onrender.com";
 const NEXUS_KEY = process.env.NEXUS_SECRET ?? "";
 
 export async function POST(req: NextRequest) {
