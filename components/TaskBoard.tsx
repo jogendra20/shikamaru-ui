@@ -55,7 +55,6 @@ export default function TaskBoard() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, any[]>>({});
-  const [debugInfo, setDebugInfo] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
   const [newGoal, setNewGoal] = useState("");
   const [newSchedule, setNewSchedule] = useState("daily");
@@ -64,19 +63,42 @@ export default function TaskBoard() {
 
   async function fetchTasks() {
     setLoading(true);
-    setDebugInfo(`URL: ${NEXUS_URL} | KEY: ${NEXUS_KEY ? NEXUS_KEY.slice(0,6)+"..." : "MISSING"}`);
     try {
       const res = await fetch(`${NEXUS_URL}/tasks`, {
         headers: { "X-API-Key": NEXUS_KEY }
       });
-      const text = await res.text();
-      setDebugInfo(`Status: ${res.status} | Body: ${text.slice(0,100)}`);
-      const data = JSON.parse(text);
+      const data = await res.json();
       setTasks(Array.isArray(data) ? data : []);
-    } catch (e: any) {
-      setDebugInfo(`Error: ${e.message}`);
+    } catch (e) {
+      console.error(e);
     }
     setLoading(false);
+  }
+
+  async function createTask() {
+    if (!newGoal.trim()) return;
+    setCreating(true);
+    setCreateMsg("Planning steps...");
+    try {
+      const res = await fetch(`${NEXUS_URL}/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": NEXUS_KEY },
+        body: JSON.stringify({ goal: newGoal.trim(), schedule: newSchedule })
+      });
+      const data = await res.json();
+      if (data.task_id) {
+        setCreateMsg(`✓ Created with ${data.steps.length} steps`);
+        setNewGoal("");
+        setShowForm(false);
+        fetchTasks();
+      } else {
+        setCreateMsg("Failed to create task");
+      }
+    } catch (e: any) {
+      setCreateMsg(`Error: ${e.message}`);
+    }
+    setCreating(false);
+    setTimeout(() => setCreateMsg(""), 3000);
   }
 
   async function runTask(taskId: string) {
@@ -99,24 +121,14 @@ export default function TaskBoard() {
   useEffect(() => { fetchTasks(); }, []);
 
   if (loading) return (
-    <div style={{ color: T.muted, fontSize: 10, fontFamily: "monospace", padding: 8 }}>{debugInfo || "Loading..."}</div>
-  );
-
-  const _loading = false; if (_loading) return (
-    <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 40 }}>
+    <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 20 }}>
       Loading tasks...
-    </div>
-  );
-
-  if (tasks.length === 0) return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ color: T.muted, fontSize: 10, fontFamily: "monospace", padding: 8, background: T.surface, borderRadius: 6 }}>{debugInfo}</div>
-      <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 20 }}>No active tasks. Use /plan to create one.</div>
     </div>
   );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <div style={{ fontSize: 9, color: T.muted, letterSpacing: "2px" }}>SCHEDULED TASKS</div>
         <div style={{ display: "flex", gap: 10 }}>
@@ -131,22 +143,24 @@ export default function TaskBoard() {
         </div>
       </div>
 
+      {/* New task form */}
       {showForm && (
         <div style={{ background: T.surface, border: `1px solid ${T.purple}40`,
-          borderRadius: 10, padding: "14px", marginBottom: 10 }}>
+          borderRadius: 10, padding: "14px", marginBottom: 4 }}>
           <div style={{ fontSize: 9, color: T.purple, letterSpacing: "2px", marginBottom: 10 }}>NEW TASK</div>
           <input
             value={newGoal}
             onChange={e => setNewGoal(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && createTask()}
             placeholder="Describe your goal..."
             style={{
               width: "100%", background: T.bg, border: `1px solid ${T.border}`,
               borderRadius: 6, padding: "8px 10px", color: T.text,
-              fontSize: 12, outline: "none", boxSizing: "border-box", marginBottom: 8
+              fontSize: 12, outline: "none", boxSizing: "border-box" as const, marginBottom: 8
             }}
           />
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            {["daily","weekly","manual"].map(s => (
+            {["daily", "weekly", "manual"].map(s => (
               <button key={s} onClick={() => setNewSchedule(s)} style={{
                 padding: "4px 10px", borderRadius: 5, fontSize: 10, cursor: "pointer",
                 background: newSchedule === s ? T.purple + "30" : T.bg,
@@ -170,13 +184,17 @@ export default function TaskBoard() {
         </div>
       )}
 
-      {tasks.map(task => (
+      {/* Task list */}
+      {tasks.length === 0 ? (
+        <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 20 }}>
+          No active tasks. Tap + new to create one.
+        </div>
+      ) : tasks.map(task => (
         <div key={task.id} style={{
           background: T.surface,
           border: `1px solid ${expanded === task.id ? T.purple + "60" : T.border}`,
           borderRadius: 10, padding: "12px 14px"
         }}>
-          {/* Header */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               width: 6, height: 6, borderRadius: "50%",
@@ -191,14 +209,12 @@ export default function TaskBoard() {
             </button>
           </div>
 
-          {/* Meta */}
           <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
             <span style={{ fontSize: 9, color: T.purple }}>⏱ {task.schedule}</span>
             <span style={{ fontSize: 9, color: T.muted }}>{task.steps.length} steps</span>
             <span style={{ fontSize: 9, color: T.muted }}>last run: {timeAgo(task.last_run)}</span>
           </div>
 
-          {/* Expanded steps */}
           {expanded === task.id && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
               {task.steps.map((step, i) => {
@@ -214,9 +230,7 @@ export default function TaskBoard() {
                     borderRadius: 6, padding: "8px 10px"
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 9, color: T.purple, fontFamily: "monospace" }}>
-                        {i + 1}
-                      </span>
+                      <span style={{ fontSize: 9, color: T.purple, fontFamily: "monospace" }}>{i + 1}</span>
                       <span style={{ fontSize: 11, color: T.text }}>{step.name}</span>
                       <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3,
                         background: T.surface, color: T.muted, marginLeft: "auto" }}>
@@ -228,7 +242,7 @@ export default function TaskBoard() {
                     </div>
                     {stepResult?.output && (
                       <div style={{ fontSize: 10, color: T.muted, marginTop: 4,
-                        fontFamily: "monospace", whiteSpace: "pre-wrap",
+                        fontFamily: "monospace", whiteSpace: "pre-wrap" as const,
                         maxHeight: 60, overflow: "hidden" }}>
                         {stepResult.output.slice(0, 150)}...
                       </div>
@@ -237,7 +251,6 @@ export default function TaskBoard() {
                 );
               })}
 
-              {/* Run button */}
               <button onClick={() => runTask(task.id)} disabled={running === task.id}
                 style={{
                   marginTop: 4, padding: "8px", borderRadius: 6,
