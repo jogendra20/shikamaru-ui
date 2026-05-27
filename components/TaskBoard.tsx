@@ -56,6 +56,11 @@ export default function TaskBoard() {
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, any[]>>({});
   const [debugInfo, setDebugInfo] = useState<string>("");
+  const [showForm, setShowForm] = useState(false);
+  const [newGoal, setNewGoal] = useState("");
+  const [newSchedule, setNewSchedule] = useState("daily");
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState("");
 
   async function fetchTasks() {
     setLoading(true);
@@ -114,11 +119,56 @@ export default function TaskBoard() {
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <div style={{ fontSize: 9, color: T.muted, letterSpacing: "2px" }}>SCHEDULED TASKS</div>
-        <button onClick={fetchTasks} style={{
-          background: "transparent", border: "none",
-          color: T.purple, fontSize: 10, cursor: "pointer"
-        }}>↻ refresh</button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setShowForm(!showForm)} style={{
+            background: "transparent", border: "none",
+            color: T.purple, fontSize: 10, cursor: "pointer"
+          }}>+ new</button>
+          <button onClick={fetchTasks} style={{
+            background: "transparent", border: "none",
+            color: T.muted, fontSize: 10, cursor: "pointer"
+          }}>↻</button>
+        </div>
       </div>
+
+      {showForm && (
+        <div style={{ background: T.surface, border: `1px solid ${T.purple}40`,
+          borderRadius: 10, padding: "14px", marginBottom: 10 }}>
+          <div style={{ fontSize: 9, color: T.purple, letterSpacing: "2px", marginBottom: 10 }}>NEW TASK</div>
+          <input
+            value={newGoal}
+            onChange={e => setNewGoal(e.target.value)}
+            placeholder="Describe your goal..."
+            style={{
+              width: "100%", background: T.bg, border: `1px solid ${T.border}`,
+              borderRadius: 6, padding: "8px 10px", color: T.text,
+              fontSize: 12, outline: "none", boxSizing: "border-box", marginBottom: 8
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            {["daily","weekly","manual"].map(s => (
+              <button key={s} onClick={() => setNewSchedule(s)} style={{
+                padding: "4px 10px", borderRadius: 5, fontSize: 10, cursor: "pointer",
+                background: newSchedule === s ? T.purple + "30" : T.bg,
+                border: `1px solid ${newSchedule === s ? T.purple : T.border}`,
+                color: newSchedule === s ? T.purple : T.muted
+              }}>{s}</button>
+            ))}
+          </div>
+          {createMsg && (
+            <div style={{ fontSize: 10, color: T.green, marginBottom: 8 }}>{createMsg}</div>
+          )}
+          <button onClick={createTask} disabled={creating} style={{
+            width: "100%", padding: "8px", borderRadius: 6,
+            background: creating ? T.surface : T.purple + "20",
+            border: `1px solid ${T.purple}40`,
+            color: creating ? T.muted : T.purple,
+            fontSize: 11, fontWeight: 600, cursor: creating ? "not-allowed" : "pointer"
+          }}>
+            {creating ? "Creating..." : "Create Task"}
+          </button>
+        </div>
+      )}
 
       {tasks.map(task => (
         <div key={task.id} style={{
