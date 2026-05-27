@@ -55,17 +55,21 @@ export default function TaskBoard() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, any[]>>({});
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   async function fetchTasks() {
     setLoading(true);
+    setDebugInfo(`URL: ${NEXUS_URL} | KEY: ${NEXUS_KEY ? NEXUS_KEY.slice(0,6)+"..." : "MISSING"}`);
     try {
       const res = await fetch(`${NEXUS_URL}/tasks`, {
         headers: { "X-API-Key": NEXUS_KEY }
       });
-      const data = await res.json();
+      const text = await res.text();
+      setDebugInfo(`Status: ${res.status} | Body: ${text.slice(0,100)}`);
+      const data = JSON.parse(text);
       setTasks(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setDebugInfo(`Error: ${e.message}`);
     }
     setLoading(false);
   }
@@ -90,14 +94,19 @@ export default function TaskBoard() {
   useEffect(() => { fetchTasks(); }, []);
 
   if (loading) return (
+    <div style={{ color: T.muted, fontSize: 10, fontFamily: "monospace", padding: 8 }}>{debugInfo || "Loading..."}</div>
+  );
+
+  const _loading = false; if (_loading) return (
     <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 40 }}>
       Loading tasks...
     </div>
   );
 
   if (tasks.length === 0) return (
-    <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 40 }}>
-      No active tasks. Use /plan to create one.
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ color: T.muted, fontSize: 10, fontFamily: "monospace", padding: 8, background: T.surface, borderRadius: 6 }}>{debugInfo}</div>
+      <div style={{ color: T.muted, fontSize: 11, textAlign: "center", marginTop: 20 }}>No active tasks. Use /plan to create one.</div>
     </div>
   );
 
