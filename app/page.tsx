@@ -1,5 +1,6 @@
 "use client";
 import OSINTPanel from "@/components/OSINTPanel";
+import TaskBoard from "@/components/TaskBoard";
 // @ts-ignore
 import LZString from "lz-string";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -788,6 +789,7 @@ export default function Home() {
 
         {tab === "activity" && (
           <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px" }}>
+            <div style={{ marginBottom: 20 }}><TaskBoard /></div>
             <div style={{ fontSize: 9, color: "#64748B", letterSpacing: "2px", marginBottom: 14 }}>AGENT ACTIVITY</div>
             {messages.filter(m => m.role === "assistant").length === 0 ? (
               <div style={{ color: "#64748B", fontSize: 11, textAlign: "center", marginTop: 40 }}>No activity yet.</div>
