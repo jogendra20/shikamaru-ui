@@ -1,8 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const AUTH_KEY = "nexus_auth_v1";
-const PASSWORD = process.env.NEXT_PUBLIC_NEXUS_PASSWORD ?? "";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -11,15 +9,17 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [shake, setShake] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(AUTH_KEY);
-    setAuthed(stored === "true");
+    fetch("/api/login").then(r => setAuthed(r.ok)).catch(() => setAuthed(false));
   }, []);
 
-  function handleUnlock() {
-    if (input === PASSWORD) {
-      localStorage.setItem(AUTH_KEY, "true");
-      setAuthed(true);
-    } else {
+  async function handleUnlock() {
+    const r = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: input }),
+    });
+    if (r.ok) setAuthed(true);
+    else {
       setError("Wrong password");
       setShake(true);
       setTimeout(() => setShake(false), 500);
