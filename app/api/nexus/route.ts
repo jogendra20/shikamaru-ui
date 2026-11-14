@@ -5,7 +5,7 @@ export const maxDuration = 60;
 const NEXUS_URL = process.env.NEXUS_URL!;
 const NEXUS_KEY = process.env.NEXUS_API_KEY!;
 
-const POST_ENDPOINTS = new Set(["orchestrate", "image", "deploy", "output", "plan", "run-task"]);
+const POST_ENDPOINTS = new Set(["orchestrate", "image", "deploy", "output", "plan", "run-task", "approve-deploy", "reject-deploy"]);
 const GET_ENDPOINTS = new Set(["tasks"]);
 
 async function forward(path: string, init: RequestInit) {

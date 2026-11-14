@@ -20,6 +20,7 @@ interface Message {
   agentLog?: AgentEvent[];
   queryType?: string;
   duration?: number;
+  pendingDeployId?: string;
 }
 
 interface AgentEvent {
@@ -385,6 +386,29 @@ export default function Home() {
     el.style.height = Math.min(el.scrollHeight, 120) + "px";
   }, []);
 
+  const decideDeploy = useCallback(async (msgId: string, id: string, action: "approve" | "reject") => {
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, pendingDeployId: undefined,
+      content: action === "approve" ? "⏳ Approved. Pushing script and starting run..." : "✗ Rejected. Nothing was run." } : m));
+    if (action === "reject") {
+      fetch("/api/nexus", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "reject-deploy", id }) }).catch(() => {});
+      return;
+    }
+    try {
+      const res = await fetch("/api/nexus", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "approve-deploy", id }) });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: `✗ ${data.error ?? "Approval failed"}` } : m));
+        return;
+      }
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: "⏳ Running...\n\nGitHub Actions setting up (~2 min). Polling every 10s..." } : m));
+      if (data.run_id) setTimeout(() => pollOutput(data.run_id, msgId), 30000);
+    } catch {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: "◆ Connection error. Check Nexus." } : m));
+    }
+  }, [pollOutput]);
+
   const handleSend = useCallback(async (forceAuto = false, overridePrompt?: string) => {
     const prompt = (overridePrompt ?? input).trim();
     if (!prompt || loading) return;
@@ -419,7 +443,7 @@ export default function Home() {
       const otype = data.type ?? "text";
       const content =
         isImage ? (data.image_b64 ? `__IMAGE__data:image/jpeg;base64,${data.image_b64}` : data.image_url ? `__IMAGE__${data.image_url}` : "Image generation failed")
-        : isAuto  ? "⏳ Running...\n\nGitHub Actions setting up (~2 min). Polling every 10s..."
+        : isAuto  ? (data.pending ? "🕒 Approval needed. Review the script before it runs:\n\n```python\n" + (data.code ?? "") + "\n```" : data.error ? `✗ ${data.error}` : "⏳ Running...\n\nGitHub Actions setting up (~2 min). Polling every 10s...")
         : otype === "clarify" ? `❓ ${data.content}`
         : otype === "image"   ? `__IMAGE__${data.content}`
         : data.content ?? data.response ?? "No response";
@@ -432,6 +456,7 @@ export default function Home() {
         agentLog: data.agent_log,
         queryType: data.query_type,
         duration: data.total_duration,
+        pendingDeployId: isAuto && data.pending ? data.id : undefined,
       };
       setMessages(prev => [...prev, assistantMsg]);
 
@@ -654,6 +679,16 @@ export default function Home() {
                             </div>
                           ) : m.role === "assistant" ? renderContent(m.content) : m.content}
                         </div>
+                        {m.role === "assistant" && m.pendingDeployId && (
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => decideDeploy(m.id, m.pendingDeployId!, "approve")}
+                              style={{ fontSize: 11, fontWeight: 600, color: "#F1F5F9", background: "#7C3AED",
+                                border: "none", borderRadius: 6, padding: "8px 14px", cursor: "pointer" }}>APPROVE &amp; RUN</button>
+                            <button onClick={() => decideDeploy(m.id, m.pendingDeployId!, "reject")}
+                              style={{ fontSize: 11, fontWeight: 600, color: "#CBD5E1", background: "transparent",
+                                border: "1px solid #1E1E2E", borderRadius: 6, padding: "8px 14px", cursor: "pointer" }}>REJECT</button>
+                          </div>
+                        )}
                         {m.role === "assistant" && m.agentLog && m.agentLog.length > 0 && (
                           <AgentLog log={m.agentLog} duration={m.duration} />
                         )}
