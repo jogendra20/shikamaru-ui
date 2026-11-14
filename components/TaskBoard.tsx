@@ -1,8 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const NEXUS_URL = process.env.NEXT_PUBLIC_NEXUS_URL ?? "";
-const NEXUS_KEY = process.env.NEXT_PUBLIC_NEXUS_API_KEY ?? "";
 
 const T = {
   bg:      "#0A0A0F",
@@ -64,9 +62,7 @@ export default function TaskBoard() {
   async function fetchTasks() {
     setLoading(true);
     try {
-      const res = await fetch(`${NEXUS_URL}/tasks`, {
-        headers: { "X-API-Key": NEXUS_KEY }
-      });
+      const res = await fetch("/api/nexus?endpoint=tasks");
       const data = await res.json();
       setTasks(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -80,10 +76,10 @@ export default function TaskBoard() {
     setCreating(true);
     setCreateMsg("Planning steps...");
     try {
-      const res = await fetch(`${NEXUS_URL}/plan`, {
+      const res = await fetch("/api/nexus", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": NEXUS_KEY },
-        body: JSON.stringify({ goal: newGoal.trim(), schedule: newSchedule })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "plan", goal: newGoal.trim(), schedule: newSchedule })
       });
       const data = await res.json();
       if (data.task_id) {
@@ -104,10 +100,10 @@ export default function TaskBoard() {
   async function runTask(taskId: string) {
     setRunning(taskId);
     try {
-      const res = await fetch(`${NEXUS_URL}/run-task`, {
+      const res = await fetch("/api/nexus", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": NEXUS_KEY },
-        body: JSON.stringify({ task_id: taskId })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: "run-task", task_id: taskId })
       });
       const data = await res.json();
       setResults(prev => ({ ...prev, [taskId]: data.results ?? [] }));
